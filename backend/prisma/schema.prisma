@@ -1,0 +1,151 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Telemetry {
+  id          String   @id @default(cuid())
+  assetId     String
+  status      String
+  healthScore Int
+  payload     Json
+  createdAt   DateTime @default(now())
+
+  @@index([assetId])
+  @@index([createdAt])
+}
+
+model Alarm {
+  id         String   @id @default(cuid())
+  assetId   String
+  message   String
+  severity  String
+  status    String   @default("OPEN") // OPEN | ACKNOWLEDGED | RESOLVED
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  resolvedAt DateTime?
+
+  @@index([assetId])
+  @@index([status])
+}
+
+model Integration {
+  id          String   @id @default(cuid())
+  name        String
+  type        String   // OPC_UA
+  endpointUrl String
+  status      String   @default("DISCONNECTED")
+
+  companyId   String?
+  company     Company? @relation(fields: [companyId], references: [id])
+
+  siteId      String?
+  site        Site? @relation(fields: [siteId], references: [id])
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tagMappings TagMapping[]
+
+  @@index([companyId])
+  @@index([siteId])
+}
+
+model Asset {
+  id        String   @id @default(cuid())
+  name      String
+  type      String   // MOTOR, PUMP, TANK, VALVE
+  location  String?
+
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id])
+
+  siteId    String?
+  site      Site? @relation(fields: [siteId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tagMappings TagMapping[]
+
+  @@index([companyId])
+  @@index([siteId])
+}
+
+model TagMapping {
+  id            String   @id @default(cuid())
+
+  integrationId String
+  integration   Integration @relation(fields: [integrationId], references: [id])
+
+  assetId       String
+  asset         Asset @relation(fields: [assetId], references: [id])
+
+  tagName       String
+  nodeId        String
+
+  role          String
+  sourceField   String?
+  unit          String?
+  label         String?
+
+  displaySlot   Int?
+  showAsMetric  Boolean @default(true)
+  showInTrend   Boolean @default(true)
+  useInHealth   Boolean @default(true)
+  useInAlarms   Boolean @default(true)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  role      String   @default("OWNER") // OWNER | ADMIN | TECHNICIAN | VIEWER
+
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+}
+
+model Company {
+  id          String   @id @default(cuid())
+  name        String
+  industry    String?
+  description String?
+
+  users        User[]
+  sites        Site[]
+  integrations Integration[]
+  assets       Asset[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+model Site {
+  id        String   @id @default(cuid())
+  name      String
+  country   String?
+  city      String?
+  location  String?
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  integrations Integration[]
+  assets       Asset[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
