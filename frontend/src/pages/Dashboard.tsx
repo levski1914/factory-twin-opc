@@ -15,19 +15,18 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { alarms, assets, trendData } from "../data/mockData";
+import { assets, trendData } from "../data/mockData";
 import { Link } from "react-router-dom";
+import { useAuth } from "../auth/AuthContext";
 
 import { useEffect, useState } from "react";
 import { socket } from "../services/socket";
 
 function Dashboard() {
+  const { signOut } = useAuth();
   const running = assets.filter((a) => a.status === "RUNNING").length;
   const warnings = assets.filter((a) => a.status === "WARNING").length;
 
-  const [liveAssetValues, setLiveAssetValues] = useState<Record<string, any>>(
-    {},
-  );
   const [assetAnalysis, setAssetAnalysis] = useState<Record<string, any>>({});
   const formatLiveValues = (assetId: string, live: any) => {
     if (!live) return null;
@@ -51,40 +50,6 @@ function Dashboard() {
     return "Live";
   };
 
-  const getLiveStatus = (assetId: string, live: any) => {
-    if (!live) return "STOPPED";
-
-    if (assetId === "motor-m101") {
-      if (live.temperature > 85 || live.vibration > 9 || live.current > 10) {
-        return "ALARM";
-      }
-
-      if (live.temperature > 70 || live.vibration > 8 || live.current > 9) {
-        return "WARNING";
-      }
-
-      return "RUNNING";
-    }
-
-    if (assetId === "pump-p201") {
-      if (live.pressure < 1.5 || live.vibration > 8) return "ALARM";
-      if (live.pressure < 2 || live.vibration > 6) return "WARNING";
-      return "RUNNING";
-    }
-
-    if (assetId === "tank-t301") {
-      if (live.level < 10 || live.level > 95) return "ALARM";
-      if (live.level < 20 || live.level > 85) return "WARNING";
-      return "RUNNING";
-    }
-
-    if (assetId === "valve-v401") {
-      if (live.position === "CLOSED") return "WARNING";
-      return "RUNNING";
-    }
-
-    return "RUNNING";
-  };
   useEffect(() => {
     socket.on("telemetry", (data) => {
       setAssetAnalysis((prev) => ({
@@ -99,98 +64,6 @@ function Dashboard() {
       socket.off("telemetry");
     };
   }, []);
-  const getDashboardAlarms = () => {
-    const generatedAlarms: {
-      assetName: string;
-      message: string;
-      severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
-    }[] = [];
-
-    Object.entries(liveAssetValues).forEach(([assetId, live]: any) => {
-      const asset = assets.find((a) => a.id === assetId);
-      if (!asset) return;
-
-      if (assetId === "motor-m101") {
-        if (live.temperature > 85) {
-          generatedAlarms.push({
-            assetName: asset.name,
-            message: "Critical temperature",
-            severity: "CRITICAL",
-          });
-        } else if (live.temperature > 70) {
-          generatedAlarms.push({
-            assetName: asset.name,
-            message: "High temperature",
-            severity: "HIGH",
-          });
-        }
-
-        if (live.vibration > 8) {
-          generatedAlarms.push({
-            assetName: asset.name,
-            message: "High vibration",
-            severity: "HIGH",
-          });
-        }
-
-        if (live.current > 9) {
-          generatedAlarms.push({
-            assetName: asset.name,
-            message: "Over current",
-            severity: "MEDIUM",
-          });
-        }
-      }
-
-      if (assetId === "pump-p201") {
-        if (live.pressure < 1.5) {
-          generatedAlarms.push({
-            assetName: asset.name,
-            message: "Low pressure",
-            severity: "HIGH",
-          });
-        }
-
-        if (live.vibration > 6) {
-          generatedAlarms.push({
-            assetName: asset.name,
-            message: "Pump vibration warning",
-            severity: "MEDIUM",
-          });
-        }
-      }
-
-      if (assetId === "tank-t301") {
-        if (live.level < 20) {
-          generatedAlarms.push({
-            assetName: asset.name,
-            message: "Low tank level",
-            severity: "HIGH",
-          });
-        }
-
-        if (live.level > 85) {
-          generatedAlarms.push({
-            assetName: asset.name,
-            message: "High tank level",
-            severity: "HIGH",
-          });
-        }
-      }
-
-      if (assetId === "valve-v401") {
-        if (live.position === "CLOSED") {
-          generatedAlarms.push({
-            assetName: asset.name,
-            message: "Valve closed",
-            severity: "LOW",
-          });
-        }
-      }
-    });
-
-    return generatedAlarms;
-  };
   const dashboardAlarms = Object.values(assetAnalysis).flatMap((asset: any) =>
     asset.alarms.map((alarm: any) => ({
       ...alarm,
@@ -221,9 +94,10 @@ function Dashboard() {
           <a>
             <Wrench size={18} /> Maintenance
           </a>
-          <a>
-            <Settings size={18} /> Settings
-          </a>
+          <Link to="/integrations"><Activity size={18} /> Integrations</Link>
+          <Link to="/tag-mapping"><Wrench size={18} /> Tag mapping</Link>
+          <Link to="/setup"><Settings size={18} /> Workspace</Link>
+          <button onClick={() => void signOut().then(() => location.assign("/"))} className="mt-6 p-3 text-left text-slate-400 hover:text-white">Log out</button>
         </nav>
       </aside>
 

@@ -11,6 +11,7 @@ import { TagMappingModule } from './tag-mapping/tag-mapping.module';
 import { AuthModule } from './auth/auth.module';
 import { CompaniesModule } from './companies/companies.module';
 import { SitesModule } from './sites/sites.module';
+import { PlatformAdminModule } from './platform-admin/platform-admin.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { SitesModule } from './sites/sites.module';
     AuthModule,
     CompaniesModule,
     SitesModule,
+    PlatformAdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -47,7 +47,7 @@ export default function AlarmsPage() {
 
   return (
     <main className="main">
-      <Link to="/" className="back-link">
+      <Link to="/dashboard" className="back-link">
         <ArrowLeft size={18} />
         Back to dashboard
       </Link>

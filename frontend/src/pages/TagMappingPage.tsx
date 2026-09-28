@@ -84,7 +84,7 @@ export default function TagMappingPage() {
 
   return (
     <main className="main">
-      <Link to="/" className="back-link">
+      <Link to="/dashboard" className="back-link">
         <ArrowLeft size={18} />
         Back to dashboard
       </Link>
@@ -158,7 +158,7 @@ function MappingRow({
 }) {
   const suggestedRole = guessRole(tag.tagName);
   const [role, setRole] = useState(suggestedRole);
-  const [label, setLabel] = useState(tag.tagName);
+  const label = tag.tagName;
   const [displaySlot, setDisplaySlot] = useState(index + 1);
   return (
     <div className="mapping-row">

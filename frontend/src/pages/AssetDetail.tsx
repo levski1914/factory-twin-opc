@@ -10,7 +10,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { assets, trendData } from "../data/mockData";
+import { assets } from "../data/mockData";
 import { socket } from "../services/socket";
 import { getTagMappings } from "../services/api";
 
@@ -144,7 +144,7 @@ export default function AssetDetail() {
     return (
       <main className="main">
         <h1>Asset not found</h1>
-        <Link to="/">Back to dashboard</Link>
+        <Link to="/dashboard">Back to dashboard</Link>
       </main>
     );
   }
@@ -327,7 +327,7 @@ export default function AssetDetail() {
   const chartLines = getChartLines();
   return (
     <main className="main">
-      <Link to="/" className="back-link">
+      <Link to="/dashboard" className="back-link">
         <ArrowLeft size={18} />
         Back to dashboard
       </Link>
