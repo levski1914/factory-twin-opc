@@ -8,6 +8,7 @@ export type Asset = {
   healthScore: number;
   location: string;
   values: {
+    [key: string]: number | string | boolean | undefined;
     speed?: number;
     current?: number;
     temperature?: number;

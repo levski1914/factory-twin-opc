@@ -7,7 +7,6 @@ import {
   PlugZap,
   RefreshCw,
   Send,
-  Server,
   Wifi,
 } from "lucide-react";
 import { browseOpc, testOpcConnection } from "../services/api";
@@ -89,9 +88,13 @@ export default function IntegrationsPage() {
 
   async function browseStart(nodeId: string) {
     setLoadingNode(nodeId);
-    const data = await browseOpc(endpointUrl, nodeId);
-    setRootTags(data);
-    setLoadingNode(null);
+    try {
+      setRootTags(await browseOpc(endpointUrl, nodeId));
+    } catch (error) {
+      setStatusText(error instanceof Error ? error.message : "Browse failed");
+    } finally {
+      setLoadingNode(null);
+    }
   }
 
   async function toggleNode(node: any) {
@@ -104,14 +107,14 @@ export default function IntegrationsPage() {
 
     if (!nodes[node.nodeId]) {
       setLoadingNode(node.nodeId);
-      const children = await browseOpc(endpointUrl, node.nodeId);
-
-      setNodes((prev) => ({
-        ...prev,
-        [node.nodeId]: children,
-      }));
-
-      setLoadingNode(null);
+      try {
+        const children = await browseOpc(endpointUrl, node.nodeId);
+        setNodes((prev) => ({ ...prev, [node.nodeId]: children }));
+      } catch (error) {
+        setStatusText(error instanceof Error ? error.message : "Browse failed");
+      } finally {
+        setLoadingNode(null);
+      }
     }
   }
 
@@ -199,7 +202,7 @@ export default function IntegrationsPage() {
 
   return (
     <main className="min-h-screen bg-slate-950 p-6 text-white">
-      <Link to="/" className="back-link">
+      <Link to="/dashboard" className="back-link">
         <ArrowLeft size={18} />
         Back to dashboard
       </Link>
