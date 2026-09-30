@@ -8,6 +8,8 @@ export function EquipmentPreview({
   metrics,
   readings,
   caption,
+  onReorder,
+  onEdit,
 }: {
   name: string;
   type: string;
@@ -15,6 +17,8 @@ export function EquipmentPreview({
   metrics: Metric[];
   readings: PlcReading[];
   caption: string;
+  onReorder?: (sourceNodeId: string, targetNodeId: string) => void;
+  onEdit?: (nodeId: string) => void;
 }) {
   const Icon =
     type === "PUMP"
@@ -66,6 +70,23 @@ export function EquipmentPreview({
             <div
               key={metric.nodeId}
               className="min-w-0 rounded-xl border border-slate-700 bg-slate-950 p-4"
+              draggable={Boolean(onReorder)}
+              onDragStart={(event) => {
+                event.dataTransfer.setData("text/plain", metric.nodeId);
+                event.dataTransfer.effectAllowed = "move";
+              }}
+              onDragOver={(event) => {
+                if (onReorder) event.preventDefault();
+              }}
+              onDrop={(event) => {
+                if (onReorder) {
+                  event.preventDefault();
+                  onReorder(
+                    event.dataTransfer.getData("text/plain"),
+                    metric.nodeId,
+                  );
+                }
+              }}
             >
               <p className="truncate text-sm text-slate-300">
                 {metric.label || metric.tagName}
@@ -86,6 +107,15 @@ export function EquipmentPreview({
                 <p className="mt-2 break-all text-xs text-amber-300">
                   {reading.statusCode}
                 </p>
+              )}
+              {onEdit && (
+                <button
+                  type="button"
+                  onClick={() => onEdit(metric.nodeId)}
+                  className="mt-4 text-xs text-cyan-300"
+                >
+                  {onReorder ? "Edit card · drag to move" : "Edit card"}
+                </button>
               )}
             </div>
           );

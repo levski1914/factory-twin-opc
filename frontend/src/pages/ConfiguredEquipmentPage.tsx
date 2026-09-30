@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { EquipmentPreview } from "../components/EquipmentPreview";
 import {
@@ -10,6 +10,7 @@ import {
 } from "../services/api";
 
 export default function ConfiguredEquipmentPage() {
+  const navigate = useNavigate();
   const { assetId } = useParams();
   const { user } = useAuth();
   const [asset, setAsset] = useState<Equipment | null>(null);
@@ -113,6 +114,17 @@ export default function ConfiguredEquipmentPage() {
               (item) => item.showAsMetric !== false,
             )}
             readings={readings}
+            onEdit={
+              canEdit
+                ? (nodeId) =>
+                    navigate(
+                      "/tag-mapping?assetId=" +
+                        asset.id +
+                        "&metricId=" +
+                        encodeURIComponent(nodeId),
+                    )
+                : undefined
+            }
             caption={
               error
                 ? "PLC data unavailable"
