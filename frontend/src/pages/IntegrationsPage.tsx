@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   Cpu,
@@ -9,10 +9,87 @@ import {
   Send,
   Wifi,
 } from "lucide-react";
-import { browseOpc, testOpcConnection } from "../services/api";
-import { Link } from "react-router-dom";
+import {
+  browseOpc,
+  testOpcConnection,
+  getSites,
+  getIntegrations,
+  saveIntegration,
+  type Site,
+  type Integration,
+} from "../services/api";
+import { useAuth } from "../auth/AuthContext";
+import { Link, useNavigate } from "react-router-dom";
 
 export default function IntegrationsPage() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [sites, setSites] = useState<Site[]>([]);
+  const [integrations, setIntegrations] = useState<Integration[]>([]);
+  const [siteId, setSiteId] = useState("");
+  const [connectionName, setConnectionName] = useState("");
+  const [integrationId, setIntegrationId] = useState("");
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    Promise.all([getSites(), getIntegrations()])
+      .then(([list, saved]) => {
+        setSites(list);
+        setIntegrations(saved);
+        setSiteId(list[0]?.id ?? "");
+      })
+      .catch((error) => setStatusText(error.message));
+  }, []);
+  function resetBrowser() {
+    setConnected(false);
+    setStatusText("Not connected");
+    setRootTags([]);
+    setNodes({});
+    setExpanded({});
+    setSelectedNodes({});
+  }
+  async function handleSaveIntegration() {
+    setSaving(true);
+    try {
+      const saved = await saveIntegration({
+        name: connectionName,
+        endpointUrl,
+        siteId,
+      });
+      setIntegrationId(saved.id);
+      setIntegrations((current) => [saved, ...current]);
+      setStatusText("Integration saved · select your tags");
+    } catch (error) {
+      setStatusText(
+        error instanceof Error ? error.message : "Could not save integration",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+  function storeTags(selected: Array<{ tagName: string; nodeId: string }>) {
+    if (!integrationId) {
+      setStatusText("Save this PLC integration before configuring equipment");
+      return false;
+    }
+    const key = "discoveredTags:" + user?.companyId + ":" + integrationId;
+    let existing: Array<{ tagName: string; nodeId: string }> = [];
+    try {
+      const stored = JSON.parse(localStorage.getItem(key) ?? "[]");
+      if (Array.isArray(stored)) existing = stored;
+    } catch {
+      /* Empty selection */
+    }
+    localStorage.setItem(
+      key,
+      JSON.stringify([
+        ...existing,
+        ...selected.filter(
+          (tag) => !existing.some((item) => item.nodeId === tag.nodeId),
+        ),
+      ]),
+    );
+    return true;
+  }
   const [endpointUrl, setEndpointUrl] = useState(
     "opc.tcp://192.168.11.10:4840",
   );
@@ -50,24 +127,12 @@ export default function IntegrationsPage() {
   }
 
   function sendSelectedToMapping() {
-    const existing = JSON.parse(localStorage.getItem("discoveredTags") ?? "[]");
-
     const selected = Object.values(selectedNodes).map((node: any) => ({
-      tagName: node.name.replace("3:", ""),
+      tagName: node.name.replace(/^\d+:/, ""),
       nodeId: node.nodeId,
     }));
-
-    const merged = [
-      ...existing,
-      ...selected.filter(
-        (tag: any) => !existing.some((item: any) => item.nodeId === tag.nodeId),
-      ),
-    ];
-
-    localStorage.setItem("discoveredTags", JSON.stringify(merged));
-    setSelectedNodes({});
-
-    alert(`${selected.length} tags sent to mapping`);
+    if (storeTags(selected))
+      navigate("/tag-mapping?integrationId=" + integrationId);
   }
   async function handleTest() {
     setStatusText("Connecting...");
@@ -119,20 +184,13 @@ export default function IntegrationsPage() {
   }
 
   function sendToMapping(node: any) {
-    const existing = JSON.parse(localStorage.getItem("discoveredTags") ?? "[]");
-
-    const tag = {
-      tagName: node.name.replace("3:", ""),
-      nodeId: node.nodeId,
-    };
-
-    const exists = existing.some((item: any) => item.nodeId === tag.nodeId);
-
-    const next = exists ? existing : [...existing, tag];
-
-    localStorage.setItem("discoveredTags", JSON.stringify(next));
-
-    alert("Tag sent to mapping");
+    if (
+      storeTags([
+        { tagName: node.name.replace(/^\d+:/, ""), nodeId: node.nodeId },
+      ])
+    ) {
+      navigate("/tag-mapping?integrationId=" + integrationId);
+    }
   }
 
   function renderNode(node: any, level = 0) {
@@ -169,6 +227,7 @@ export default function IntegrationsPage() {
             {isVariable && (
               <input
                 type="checkbox"
+                onClick={(event) => event.stopPropagation()}
                 checked={isSelected}
                 onChange={() => toggleSelect(node)}
                 className="h-4 w-4 accent-cyan-400"
@@ -238,10 +297,58 @@ export default function IntegrationsPage() {
           </div>
         </div>
 
+        <div className="mb-4 grid gap-3 md:grid-cols-2">
+          <label className="grid gap-2 text-sm text-slate-300">
+            Saved integration
+            <select
+              className="rounded-xl border border-slate-700 bg-slate-950 p-3"
+              value={integrationId}
+              onChange={(e) => {
+                const saved = integrations.find(
+                  (item) => item.id === e.target.value,
+                );
+                resetBrowser();
+                setIntegrationId(saved?.id ?? "");
+                if (saved) {
+                  setEndpointUrl(saved.endpointUrl);
+                  setSiteId(saved.siteId);
+                  setConnectionName(saved.name);
+                }
+              }}
+            >
+              <option value="">New PLC connection</option>
+              {integrations.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-2 text-sm text-slate-300">
+            Site
+            <select
+              disabled={Boolean(integrationId)}
+              className="rounded-xl border border-slate-700 bg-slate-950 p-3"
+              value={siteId}
+              onChange={(e) => setSiteId(e.target.value)}
+            >
+              <option value="">Select site</option>
+              {sites.map((site) => (
+                <option key={site.id} value={site.id}>
+                  {site.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
         <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
           <input
             value={endpointUrl}
-            onChange={(e) => setEndpointUrl(e.target.value)}
+            onChange={(e) => {
+              setEndpointUrl(e.target.value);
+              setIntegrationId("");
+              resetBrowser();
+            }}
             className="rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-500"
           />
 
@@ -254,6 +361,27 @@ export default function IntegrationsPage() {
           </button>
         </div>
 
+        {!integrationId && (
+          <div className="mt-4 flex flex-wrap gap-3">
+            <input
+              aria-label="PLC integration name"
+              maxLength={120}
+              className="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-950 p-3"
+              placeholder="PLC name · production line"
+              value={connectionName}
+              onChange={(e) => setConnectionName(e.target.value)}
+            />
+            <button
+              disabled={
+                !connected || !siteId || !connectionName.trim() || saving
+              }
+              onClick={handleSaveIntegration}
+              className="rounded-xl bg-cyan-400 px-5 py-3 font-semibold text-slate-950 disabled:opacity-40"
+            >
+              {saving ? "Saving..." : "Save integration"}
+            </button>
+          </div>
+        )}
         <div className="mt-4 flex flex-wrap gap-3">
           <button
             onClick={() => browseStart("ns=0;i=85")}
@@ -301,7 +429,7 @@ export default function IntegrationsPage() {
 
         <button
           onClick={sendSelectedToMapping}
-          disabled={Object.keys(selectedNodes).length === 0}
+          disabled={!integrationId || Object.keys(selectedNodes).length === 0}
           className="rounded-xl bg-cyan-500 px-4 py-3 text-sm font-semibold text-slate-950 disabled:opacity-40"
         >
           Send Selected ({Object.keys(selectedNodes).length})
