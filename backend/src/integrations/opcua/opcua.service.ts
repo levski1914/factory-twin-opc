@@ -1,5 +1,5 @@
 // opcua.service.ts
-import { Injectable } from '@nestjs/common';
+import { BadGatewayException, Injectable } from '@nestjs/common';
 import {
   OPCUAClient,
   BrowseDirection,
@@ -7,8 +7,40 @@ import {
   UserTokenType,
 } from 'node-opcua';
 import { AttributeIds } from 'node-opcua';
+import type { ClientSession } from 'node-opcua';
 @Injectable()
 export class OpcuaService {
+  async readNodes(endpointUrl: string, nodeIds: string[]) {
+    const client = OPCUAClient.create({
+      endpointMustExist: false,
+      connectionStrategy: { maxRetry: 0 },
+      transportTimeout: 10000,
+      requestedSessionTimeout: 10000,
+    });
+    let session: ClientSession | undefined;
+    try {
+      await client.connect(endpointUrl);
+      session = await client.createSession();
+      const values = await session.read(
+        nodeIds.map((nodeId) => ({ nodeId, attributeId: AttributeIds.Value })),
+      );
+      return values.map((data, index) => ({
+        nodeId: nodeIds[index],
+        value: data.statusCode.isGood() ? (data.value?.value ?? null) : null,
+        statusCode: data.statusCode.toString(),
+        good: data.statusCode.isGood(),
+        timestamp:
+          (data.sourceTimestamp ?? data.serverTimestamp)?.toISOString() ?? null,
+      }));
+    } catch (error: unknown) {
+      throw new BadGatewayException(
+        error instanceof Error ? error.message : 'Could not read PLC values',
+      );
+    } finally {
+      if (session) await session.close().catch(() => undefined);
+      await client.disconnect().catch(() => undefined);
+    }
+  }
   async testConnection(endpointUrl: string) {
     const client = OPCUAClient.create({
       endpointMustExist: false,

@@ -1,0 +1,101 @@
+import { Activity, Gauge, Waves, Settings, CircleGauge } from "lucide-react";
+import type { Metric, PlcReading } from "../services/api";
+
+export function EquipmentPreview({
+  name,
+  type,
+  location,
+  metrics,
+  readings,
+  caption,
+}: {
+  name: string;
+  type: string;
+  location: string;
+  metrics: Metric[];
+  readings: PlcReading[];
+  caption: string;
+}) {
+  const Icon =
+    type === "PUMP"
+      ? Waves
+      : type === "VALVE"
+        ? Settings
+        : type === "TANK"
+          ? Gauge
+          : type === "SHAFT"
+            ? CircleGauge
+            : Activity;
+  return (
+    <section className="rounded-2xl border border-cyan-500/30 bg-slate-900 p-6">
+      <div className="mb-5 flex items-center gap-4">
+        <span className="rounded-xl bg-cyan-400/10 p-3 text-cyan-300">
+          <Icon size={28} />
+        </span>
+        <div>
+          <p className="text-xs uppercase tracking-widest text-cyan-300">
+            {type}
+          </p>
+          <h2 className="mt-1 text-xl font-semibold text-white">
+            {name || "Equipment name"}
+          </h2>
+          <p className="mt-1 text-sm text-slate-400">
+            {location || "Location"}
+          </p>
+        </div>
+      </div>
+      <p className="mb-5 text-xs text-slate-400">{caption}</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {metrics.map((metric) => {
+          const reading = readings.find(
+            (item) => item.nodeId === metric.nodeId,
+          );
+          const value =
+            !reading || !reading.good
+              ? "—"
+              : typeof reading.value === "boolean"
+                ? reading.value
+                  ? "ON"
+                  : "OFF"
+                : typeof reading.value === "number"
+                  ? new Intl.NumberFormat(undefined, {
+                      maximumFractionDigits: 2,
+                    }).format(reading.value)
+                  : String(reading.value ?? "—");
+          return (
+            <div
+              key={metric.nodeId}
+              className="min-w-0 rounded-xl border border-slate-700 bg-slate-950 p-4"
+            >
+              <p className="truncate text-sm text-slate-300">
+                {metric.label || metric.tagName}
+              </p>
+              <p className="mt-3 break-words text-2xl font-semibold text-white">
+                {value}{" "}
+                <small className="text-sm font-normal text-cyan-300">
+                  {metric.unit}
+                </small>
+              </p>
+              <p
+                className="mt-3 truncate text-xs text-slate-500"
+                title={metric.nodeId}
+              >
+                {metric.tagName}
+              </p>
+              {reading && !reading.good && (
+                <p className="mt-2 break-all text-xs text-amber-300">
+                  {reading.statusCode}
+                </p>
+              )}
+            </div>
+          );
+        })}
+        {metrics.length === 0 && (
+          <p className="col-span-full rounded-xl border border-dashed border-slate-700 p-8 text-center text-sm text-slate-400">
+            Choose the tags you want to display.
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}

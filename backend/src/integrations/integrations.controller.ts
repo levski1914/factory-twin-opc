@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { OpcuaService } from './opcua/opcua.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -17,11 +25,27 @@ export class IntegrationsController {
 
   @Post()
   @Roles('OWNER', 'ADMIN', 'TECHNICIAN')
-  create(@Body() body: CreateIntegrationDto, @CurrentUser() user: any) {
+  async create(@Body() body: CreateIntegrationDto, @CurrentUser() user: any) {
+    if (
+      !user.companyId ||
+      !body ||
+      typeof body.name !== 'string' ||
+      !body.name.trim() ||
+      body.name.length > 120 ||
+      typeof body.endpointUrl !== 'string' ||
+      !body.endpointUrl.startsWith('opc.tcp://') ||
+      !body.siteId
+    )
+      throw new BadRequestException('Provide a name, OPC UA endpoint and site');
+    const site = await this.prisma.site.findFirst({
+      where: { id: body.siteId, companyId: user.companyId },
+    });
+    if (!site)
+      throw new BadRequestException('Site does not belong to your company');
     return this.prisma.integration.create({
       data: {
-        name: body.name,
-        type: body.type ?? 'OPC_UA',
+        name: body.name.trim(),
+        type: 'OPC_UA',
         endpointUrl: body.endpointUrl,
         companyId: user.companyId,
         siteId: body.siteId,
@@ -32,6 +56,8 @@ export class IntegrationsController {
   @Get()
   @Roles('OWNER', 'ADMIN', 'TECHNICIAN', 'VIEWER')
   findAll(@CurrentUser() user: any, @Query('siteId') siteId?: string) {
+    if (!user.companyId)
+      throw new BadRequestException('A company account is required');
     return this.prisma.integration.findMany({
       where: {
         companyId: user.companyId,
