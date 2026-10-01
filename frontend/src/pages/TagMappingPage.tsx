@@ -17,6 +17,12 @@ import {
 } from "../services/api";
 
 const roles: Record<string, string> = {
+  power: "kW",
+  voltage: "V",
+  energy: "kWh",
+  frequency: "Hz",
+  torque: "Nm",
+  runtime: "h",
   current: "A",
   temperature: "°C",
   speed: "%",
@@ -72,6 +78,9 @@ export default function TagMappingPage() {
   const [reading, setReading] = useState(false);
   const [readAt, setReadAt] = useState("");
   const [loading, setLoading] = useState(true);
+  const [editingNodeId, setEditingNodeId] = useState(
+    params.get("metricId") ?? "",
+  );
 
   useEffect(() => {
     let active = true;
@@ -161,6 +170,33 @@ export default function TagMappingPage() {
       [next[index], next[target]] = [next[target], next[index]];
       return next;
     });
+  }
+  function reorder(source: string, target: string) {
+    setDrafts((current) => {
+      const from = current.findIndex((item) => item.nodeId === source);
+      const to = current.findIndex((item) => item.nodeId === target);
+      if (from < 0 || to < 0 || from === to) return current;
+      const next = [...current];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  }
+  const editingIndex = drafts.findIndex(
+    (item) => item.nodeId === editingNodeId,
+  );
+  const editingMetric = drafts[editingIndex];
+  function replaceSource(nodeId: string) {
+    const selected = drafts.findIndex((item) => item.nodeId === nodeId);
+    if (selected < 0 || editingIndex < 0 || selected === editingIndex) return;
+    setDrafts((current) => {
+      const next = [...current];
+      next[editingIndex] = { ...current[selected], enabled: true };
+      next[selected] = { ...current[editingIndex], enabled: false };
+      return next;
+    });
+    setEditingNodeId(nodeId);
+    setReadings([]);
   }
   const metrics = drafts
     .filter((item) => item.enabled)
@@ -481,15 +517,103 @@ export default function TagMappingPage() {
               location={location}
               metrics={metrics}
               readings={readings}
+              onReorder={canEdit && !busy && !reading ? reorder : undefined}
+              onEdit={
+                canEdit && !busy && !reading ? setEditingNodeId : undefined
+              }
               caption={
                 readings.length
                   ? "PLC values read at " + readAt
                   : "Layout preview · values have not been read yet"
               }
             />
+            {editingMetric && (
+              <fieldset
+                disabled={!canEdit || busy || reading}
+                className="mt-4 grid gap-4 rounded-xl border border-cyan-500/30 bg-slate-900 p-5"
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold">Edit this card</h3>
+                  <button
+                    type="button"
+                    onClick={() => setEditingNodeId("")}
+                    className="text-sm text-slate-400"
+                  >
+                    Close
+                  </button>
+                </div>
+                <label className="grid gap-2 text-sm">
+                  PLC tag
+                  <select
+                    className={input}
+                    value={editingNodeId}
+                    onChange={(event) => replaceSource(event.target.value)}
+                  >
+                    {drafts.map((item) => (
+                      <option key={item.nodeId} value={item.nodeId}>
+                        {item.tagName}
+                        {item.enabled && item.nodeId !== editingNodeId
+                          ? " · move to this card"
+                          : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-2 text-sm">
+                  Display label
+                  <input
+                    className={input}
+                    maxLength={120}
+                    value={editingMetric.label}
+                    onChange={(event) =>
+                      update(editingIndex, { label: event.target.value })
+                    }
+                  />
+                </label>
+                <label className="grid gap-2 text-sm">
+                  Metric meaning
+                  <select
+                    className={input}
+                    value={editingMetric.role}
+                    onChange={(event) =>
+                      update(editingIndex, {
+                        role: event.target.value,
+                        unit: roles[event.target.value],
+                      })
+                    }
+                  >
+                    {Object.keys(roles).map((role) => (
+                      <option key={role}>{role}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-2 text-sm">
+                  Unit
+                  <input
+                    className={input}
+                    maxLength={32}
+                    value={editingMetric.unit}
+                    onChange={(event) =>
+                      update(editingIndex, { unit: event.target.value })
+                    }
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="text-left text-sm text-amber-300"
+                  onClick={() => {
+                    update(editingIndex, { enabled: false });
+                    setEditingNodeId("");
+                  }}
+                >
+                  Remove this card from the view
+                </button>
+              </fieldset>
+            )}
             <p className="mt-4 text-sm leading-relaxed text-slate-400">
-              Use the arrows to arrange cards. Labels and units update
-              immediately. Units are display labels; values are not converted.
+              Drag the preview cards or use the arrows to arrange them. Edit a
+              card to change its PLC tag, label and unit. Units are display
+              labels; values are not converted.
             </p>
             {equipmentId && (
               <Link

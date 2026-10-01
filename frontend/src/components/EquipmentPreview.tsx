@@ -1,4 +1,4 @@
-import { Activity, Gauge, Waves, Settings, CircleGauge } from "lucide-react";
+import { Activity, Gauge, Waves, Settings, CircleGauge, Thermometer, Zap } from "lucide-react";
 import type { Metric, PlcReading } from "../services/api";
 
 export function EquipmentPreview({
@@ -8,13 +8,19 @@ export function EquipmentPreview({
   metrics,
   readings,
   caption,
+  onReorder,
+  onEdit,
+  expanded = false,
 }: {
+  expanded?: boolean;
   name: string;
   type: string;
   location: string;
   metrics: Metric[];
   readings: PlcReading[];
   caption: string;
+  onReorder?: (sourceNodeId: string, targetNodeId: string) => void;
+  onEdit?: (nodeId: string) => void;
 }) {
   const Icon =
     type === "PUMP"
@@ -27,7 +33,7 @@ export function EquipmentPreview({
             ? CircleGauge
             : Activity;
   return (
-    <section className="rounded-2xl border border-cyan-500/30 bg-slate-900 p-6">
+    <section className={expanded ? "equipment-live-preview" : "panel"}>
       <div className="mb-5 flex items-center gap-4">
         <span className="rounded-xl bg-cyan-400/10 p-3 text-cyan-300">
           <Icon size={28} />
@@ -45,7 +51,8 @@ export function EquipmentPreview({
         </div>
       </div>
       <p className="mb-5 text-xs text-slate-400">{caption}</p>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className={expanded ? "equipment-metric-grid" : "grid gap-3 sm:grid-cols-2"}>
+        {expanded && <div className="panel asset-hero"><Icon size={52} className="text-sky-400 mb-4"/><h3>{name}</h3><p className="empty-text">{metrics.length} configured metrics</p><p className="empty-text mt-3">Health: not configured</p></div>}
         {metrics.map((metric) => {
           const reading = readings.find(
             (item) => item.nodeId === metric.nodeId,
@@ -65,8 +72,26 @@ export function EquipmentPreview({
           return (
             <div
               key={metric.nodeId}
-              className="min-w-0 rounded-xl border border-slate-700 bg-slate-950 p-4"
+              className="metric-card min-w-0"
+              draggable={Boolean(onReorder)}
+              onDragStart={(event) => {
+                event.dataTransfer.setData("text/plain", metric.nodeId);
+                event.dataTransfer.effectAllowed = "move";
+              }}
+              onDragOver={(event) => {
+                if (onReorder) event.preventDefault();
+              }}
+              onDrop={(event) => {
+                if (onReorder) {
+                  event.preventDefault();
+                  onReorder(
+                    event.dataTransfer.getData("text/plain"),
+                    metric.nodeId,
+                  );
+                }
+              }}
             >
+              {metric.role === "temperature" ? <Thermometer size={24}/> : ["power", "current", "voltage", "energy"].includes(metric.role) ? <Zap size={24}/> : <Gauge size={24}/>}
               <p className="truncate text-sm text-slate-300">
                 {metric.label || metric.tagName}
               </p>
@@ -86,6 +111,15 @@ export function EquipmentPreview({
                 <p className="mt-2 break-all text-xs text-amber-300">
                   {reading.statusCode}
                 </p>
+              )}
+              {onEdit && (
+                <button
+                  type="button"
+                  onClick={() => onEdit(metric.nodeId)}
+                  className="mt-4 text-xs text-cyan-300"
+                >
+                  {onReorder ? "Edit card · drag to move" : "Edit card"}
+                </button>
               )}
             </div>
           );

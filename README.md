@@ -20,8 +20,8 @@ The current platform overview is read only and shows company counts. Company and
 
 1. At `/integrations`, select a site, name the PLC connection, test it and save the integration.
 2. Browse PLC variables, select the equipment tags and click Send Selected.
-3. In the equipment configurator, enter the name, type and location. Rename metric labels, edit display units, select cards and use the arrows to set their order. The preview updates immediately. Read PLC Values reads actual selected tags; placeholders are shown until a successful read. Units only change the display label and do not convert raw values.
-4. Save Equipment writes the equipment and its mapping in one transaction. The saved view at `/equipment/:id` reads values every five seconds, shows read quality and clears values when the PLC is unavailable. Reopen Edit Equipment to change the saved configuration.
+3. In the equipment configurator, enter the name, type and location. Rename metric labels, edit display units, select cards and drag cards in the right-hand preview or use the arrows to set their order. Click Edit Card to change a card's PLC tag, meaning, label and unit. Selecting a tag already used elsewhere moves it into this card and removes the duplicate card. Power, voltage, energy, frequency, torque and runtime are available as metric meanings. Read PLC Values reads actual selected tags; placeholders are shown until a successful read. Units only change the display label and do not convert raw values.
+4. Save Equipment writes the equipment and its mapping in one transaction. The saved view at `/equipment/:id` reads values every five seconds, shows read quality and clears values when the PLC is unavailable. Edit Equipment opens the whole configuration; Edit Card on a live card opens configuration with that card selected.
 
 The normal dashboard and asset registry list saved equipment belonging to the signed-in company. The previous fixed-ID demonstration dashboard remains at `/demo`. Configuration uses existing Prisma fields; no new database migration is required. The earlier unscoped demo assets have no company and are not automatically assigned to customer accounts.
 

@@ -635,3 +635,28 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* Configured equipment uses the original industrial dashboard palette. */
+.equipment-workspace .main { min-width: 0; }
+.workspace-email { overflow-wrap: anywhere; margin-top: 24px; }
+.equipment-action { background: #38bdf8; color: #07111f; padding: 12px 18px; border-radius: 12px; font-weight: 600; }
+.equipment-workspace .topbar, .equipment-detail .panel-header { flex-wrap: wrap; gap: 12px; }
+.equipment-scene { height: auto; min-height: 260px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+.equipment-scene .machine { overflow-wrap: anywhere; }
+.equipment-list-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px; background: #0f2135; border: 1px solid #20384f; border-radius: 14px; }
+.equipment-list-row a { color: #38bdf8; white-space: nowrap; }
+.equipment-metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.equipment-live-preview { margin-bottom: 20px; }
+@media (max-width: 1100px) {
+  .equipment-workspace { flex-direction: column; }
+  .equipment-workspace .sidebar { display: block; width: 100%; padding: 16px; }
+  .equipment-workspace .brand { margin-bottom: 12px; }
+  .equipment-workspace .sidebar nav { display: flex; flex-wrap: wrap; align-items: center; }
+  .equipment-workspace .workspace-email { display: none; }
+  .equipment-workspace .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .equipment-workspace .main, .equipment-detail { padding: 16px; }
+  .equipment-metric-grid { grid-template-columns: 1fr; }
+  .equipment-detail .panel { min-width: 0; }
+}
