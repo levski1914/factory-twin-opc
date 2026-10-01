@@ -4,6 +4,7 @@ import {
   XAxis,
   YAxis,
   Tooltip,
+  Legend,
   ResponsiveContainer,
 } from "recharts";
 import { useEffect, useState } from "react";
@@ -57,7 +58,7 @@ export default function ConfiguredEquipmentPage() {
           setError("No metrics configured");
           return;
         }
-        setSelectedMetric(mappings[0].nodeId);
+        setSelectedMetric("");
         async function poll() {
           try {
             const data = await readEquipmentPreview(mappings[0].integrationId, [
@@ -110,6 +111,21 @@ export default function ConfiguredEquipmentPage() {
       clearTimeout(timer);
     };
   }, [assetId]);
+  const trendMetrics = (asset?.tagMappings ?? []).filter(
+    (metric) =>
+      metric.showAsMetric !== false &&
+      (!selectedMetric || metric.nodeId === selectedMetric),
+  );
+  const trendColors = [
+    "#38bdf8",
+    "#fb923c",
+    "#4ade80",
+    "#c084fc",
+    "#facc15",
+    "#f472b6",
+    "#2dd4bf",
+    "#f87171",
+  ];
   const canEdit = ["OWNER", "ADMIN", "TECHNICIAN"].includes(user?.role ?? "");
   return (
     <main className="main min-h-screen equipment-detail">
@@ -184,6 +200,7 @@ export default function ConfiguredEquipmentPage() {
                   value={selectedMetric}
                   onChange={(event) => setSelectedMetric(event.target.value)}
                 >
+                  <option value="">All metrics</option>
                   {asset.tagMappings
                     .filter((m) => m.showAsMetric !== false)
                     .map((m) => (
@@ -194,8 +211,10 @@ export default function ConfiguredEquipmentPage() {
                     ))}
                 </select>
               </label>
-              {history.some(
-                (point) => typeof point[selectedMetric] === "number",
+              {history.some((point) =>
+                trendMetrics.some(
+                  (metric) => typeof point[metric.nodeId] === "number",
+                ),
               ) ? (
                 <ResponsiveContainer width="100%" height={240}>
                   <LineChart data={history}>
@@ -207,23 +226,37 @@ export default function ConfiguredEquipmentPage() {
                         borderColor: "#1f354d",
                       }}
                     />
-                    <Line
-                      dataKey={(point) => point[selectedMetric]}
-                      name={
-                        asset.tagMappings.find(
-                          (m) => m.nodeId === selectedMetric,
-                        )?.label || selectedMetric
-                      }
-                      stroke="#38bdf8"
-                      dot={false}
-                      isAnimationActive={false}
-                      connectNulls={false}
-                    />
+                    <Legend />
+                    {trendMetrics.map((metric, index) => (
+                      <Line
+                        key={metric.nodeId}
+                        dataKey={(point) => point[metric.nodeId]}
+                        name={
+                          (metric.label || metric.tagName) +
+                          (metric.unit ? ` (${metric.unit})` : "")
+                        }
+                        stroke={trendColors[index % trendColors.length]}
+                        strokeDasharray={
+                          index >= trendColors.length ? "5 3" : undefined
+                        }
+                        strokeWidth={2}
+                        dot={history.length === 1}
+                        isAnimationActive={false}
+                        connectNulls={false}
+                      />
+                    ))}
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
                 <p className="empty-text">
                   Waiting for numeric PLC readings for this metric.
+                </p>
+              )}
+              {!selectedMetric && (
+                <p className="mt-3 text-xs text-slate-400">
+                  All numeric metrics share one raw-value scale. Units are shown
+                  in the legend and tooltip. Select one metric for a closer
+                  view.
                 </p>
               )}
             </section>

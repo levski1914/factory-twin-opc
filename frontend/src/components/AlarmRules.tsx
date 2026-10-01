@@ -39,25 +39,41 @@ export function LiveAlarmRules({
     <div className="space-y-3">
       {!rules.length && <p className="empty-text">No alarm tags configured.</p>}
       {rules.map((rule, index) => {
-        const state = alarmState(
-          rule,
-          readings.find((r) => r.nodeId === rule.nodeId),
-        );
+        const reading = readings.find((r) => r.nodeId === rule.nodeId);
+        const state = alarmState(rule, reading);
         return (
           <div key={index} className="rounded-xl border border-slate-700 p-3">
             <strong>{rule.name}</strong>
             <p
               className={
                 state === "ACTIVE"
-                  ? "text-red-300"
+                  ? rule.severity === "CRITICAL"
+                    ? "text-red-300"
+                    : "text-amber-300"
                   : state === "NORMAL"
                     ? "text-green-300"
                     : "text-amber-300"
               }
             >
-              {state} · {rule.severity}
+              {state === "ACTIVE"
+                ? `Active · ${rule.severity}`
+                : state === "NORMAL"
+                  ? "Inactive"
+                  : "Unknown · check PLC data"}
             </p>
-            <small className="text-slate-400">{rule.tagName}</small>
+            <small className="block break-all text-slate-400">
+              {rule.tagName}
+            </small>
+            <small className="block text-slate-400">
+              PLC value:{" "}
+              {reading?.good && reading.value != null
+                ? String(reading.value)
+                : "Unavailable"}{" "}
+              · Active when: {rule.condition}
+              {!["TRUE", "FALSE"].includes(rule.condition)
+                ? ` ${rule.threshold}`
+                : ""}
+            </small>
           </div>
         );
       })}
