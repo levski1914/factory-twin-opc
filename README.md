@@ -28,3 +28,16 @@ The normal dashboard and asset registry list saved equipment belonging to the si
 The old background reader for the fixed `motor-m101` runs only when the backend environment has `ENABLE_LEGACY_DEMO_TELEMETRY=true`. It is off by default; configured equipment reads its own selected tags through the authenticated preview endpoint.
 
 Configured equipment currently displays live values. Historical trends, equipment-specific alarm thresholds and predictive analysis will need to be connected to these real equipment IDs in the next stage.
+
+
+### Equipment alarm tags (October 2026)
+
+After applying this update, run `npx prisma migrate deploy` and `npx prisma generate` from `backend/`, then restart the backend and frontend.
+
+The equipment editor has a separate Alarm tags section. Browse the selected saved PLC in a new tab, send the desired tags, return to the original editor and click Import selected tags for alarms. Unsaved edits remain in the original tab. An alarm tag does not need a metric card. Save equipment to persist both lists together.
+
+Rules support BOOL/0/1 states, numeric greater-than/less-than/equality, and bit indices 0–31 in a 32-bit integer word. Bad quality, missing readings and incompatible values display UNKNOWN. Live rules are evaluated only while the equipment view is open, at the existing five-second poll interval. Short pulses can be missed. There is no persistent alarm-event history, acknowledgement workflow, notification or PLC write in this update.
+
+Copy alarm template lists other equipment of the same type in your company. It appends names, conditions and severity to the current draft, clearing source tag addresses. Bind each rule to the target machine's actual tag, then save. Existing equipment is never changed in bulk. A shared summary BOOL cannot identify which individual machine failed. Distinct instance members, array elements, bit positions or equipment-identifying codes require explicit mapping.
+
+Up to 64 distinct node IDs across metric and alarm lists are read in one OPC UA batch. At least one metric remains required by the current equipment editor. Templates come from saved equipment; there is no separate template catalogue yet.

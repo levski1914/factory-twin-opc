@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { validateAlarmRules, type AlarmRule } from './alarm-rules';
 import { PrismaService } from '../prisma/prisma.service';
 import { OpcuaService } from '../integrations/opcua/opcua.service';
 
@@ -27,6 +28,7 @@ export type EquipmentInput = {
   siteId: string;
   integrationId: string;
   mappings: MetricInput[];
+  alarmRules?: AlarmRule[];
 };
 
 @Injectable()
@@ -119,6 +121,19 @@ export class TagMappingService {
       );
     }
     const mappings = this.validateMappings(body.mappings);
+    const alarmRules =
+      body.alarmRules === undefined
+        ? undefined
+        : validateAlarmRules(body.alarmRules, body.integrationId);
+    if (
+      new Set([
+        ...mappings.map((m) => m.nodeId),
+        ...(alarmRules ?? []).map((r) => r.nodeId),
+      ]).size > 64
+    )
+      throw new BadRequestException(
+        'Select at most 64 distinct PLC tags across metrics and alarms',
+      );
     return this.prisma.$transaction(async (tx) => {
       const site = await tx.site.findFirst({
         where: { id: body.siteId, companyId },
@@ -136,7 +151,27 @@ export class TagMappingService {
       ) {
         throw new NotFoundException('Asset not found');
       }
+      if (body.id && alarmRules === undefined) {
+        const existing = await tx.asset.findFirst({
+          where: { id: body.id, companyId },
+        });
+        const saved = (existing?.alarmRules ?? []) as AlarmRule[];
+        if (saved.some((rule) => rule.integrationId !== integration.id))
+          throw new BadRequestException(
+            'Rebind alarm rules before changing the PLC connection',
+          );
+        if (
+          new Set([
+            ...mappings.map((m) => m.nodeId),
+            ...saved.map((r) => r.nodeId),
+          ]).size > 64
+        )
+          throw new BadRequestException(
+            'Select at most 64 distinct PLC tags across metrics and alarms',
+          );
+      }
       const data = {
+        ...(alarmRules !== undefined ? { alarmRules } : {}),
         name: body.name.trim(),
         type: body.type,
         location: body.location?.trim() ?? '',

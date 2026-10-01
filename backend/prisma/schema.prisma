@@ -57,6 +57,7 @@ model Integration {
 }
 
 model Asset {
+  alarmRules Json @default("[]")
   id        String   @id @default(cuid())
   name      String
   type      String   // MOTOR, PUMP, TANK, VALVE

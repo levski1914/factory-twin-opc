@@ -1,7 +1,15 @@
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import { LiveAlarmRules } from "../components/AlarmRules";
 import { EquipmentPreview } from "../components/EquipmentPreview";
 import {
   getAssets,
@@ -18,7 +26,9 @@ export default function ConfiguredEquipmentPage() {
   const [loading, setLoading] = useState(true);
   const [readings, setReadings] = useState<PlcReading[]>([]);
   const [error, setError] = useState("");
-  const [history, setHistory] = useState<Array<Record<string, number | string | null>>>([]);
+  const [history, setHistory] = useState<
+    Array<Record<string, number | string | null>>
+  >([]);
   const [selectedMetric, setSelectedMetric] = useState("");
   const [readAt, setReadAt] = useState("");
   useEffect(() => {
@@ -50,22 +60,35 @@ export default function ConfiguredEquipmentPage() {
         setSelectedMetric(mappings[0].nodeId);
         async function poll() {
           try {
-            const data = await readEquipmentPreview(
-              mappings[0].integrationId,
-              mappings.map((item) => item.nodeId),
-            );
+            const data = await readEquipmentPreview(mappings[0].integrationId, [
+              ...new Set([
+                ...mappings.map((item) => item.nodeId),
+                ...(found!.alarmRules ?? []).map((rule) => rule.nodeId),
+              ]),
+            ]);
             if (active) {
               setReadings(data);
-              const point: Record<string, number | string | null> = { time: new Date().toLocaleTimeString() };
-              data.forEach(item => { point[item.nodeId] = item.good && typeof item.value === "number" ? item.value : null; });
-              setHistory(previous => [...previous, point].slice(-120));
+              const point: Record<string, number | string | null> = {
+                time: new Date().toLocaleTimeString(),
+              };
+              data.forEach((item) => {
+                point[item.nodeId] =
+                  item.good && typeof item.value === "number"
+                    ? item.value
+                    : null;
+              });
+              setHistory((previous) => [...previous, point].slice(-120));
               setError("");
               setReadAt(new Date().toLocaleTimeString());
             }
           } catch (reason) {
             if (active) {
               setReadings([]);
-              setHistory(previous => [...previous, { time: new Date().toLocaleTimeString() }].slice(-120));
+              setHistory((previous) =>
+                [...previous, { time: new Date().toLocaleTimeString() }].slice(
+                  -120,
+                ),
+              );
               setError(
                 reason instanceof Error ? reason.message : "PLC unavailable",
               );
@@ -147,14 +170,90 @@ export default function ConfiguredEquipmentPage() {
             }
           />
         )}
-        {asset && <div className="detail-bottom-grid">
-          <section className="panel"><div className="panel-header"><h2>Live Trends</h2><span>Current session · up to 120 readings</span></div>
-            <label className="empty-text">Metric <select className="mb-4 max-w-full" value={selectedMetric} onChange={event => setSelectedMetric(event.target.value)}>{asset.tagMappings.filter(m => m.showAsMetric !== false).map(m => <option key={m.nodeId} value={m.nodeId}>{m.label || m.tagName}{m.unit ? ` (${m.unit})` : ""}</option>)}</select></label>
-            {history.some(point => typeof point[selectedMetric] === "number") ? <ResponsiveContainer width="100%" height={240}><LineChart data={history}><XAxis dataKey="time" stroke="#8fa9c4"/><YAxis stroke="#8fa9c4"/><Tooltip contentStyle={{background: "#0b1728", borderColor: "#1f354d"}}/><Line dataKey={point => point[selectedMetric]} name={asset.tagMappings.find(m => m.nodeId === selectedMetric)?.label || selectedMetric} stroke="#38bdf8" dot={false} isAnimationActive={false} connectNulls={false}/></LineChart></ResponsiveContainer> : <p className="empty-text">Waiting for numeric PLC readings for this metric.</p>}
-          </section>
-          <section className="panel"><div className="panel-header"><h2>Live Alarms</h2></div><p className="empty-text">Alarm rules are not connected to this equipment yet.</p></section>
-          <section className="panel"><div className="panel-header"><h2>Predictive Maintenance</h2></div><p className="empty-text">Health and prediction models are not configured for this equipment.</p></section>
-        </div>}
+        {asset && (
+          <div className="detail-bottom-grid">
+            <section className="panel">
+              <div className="panel-header">
+                <h2>Live Trends</h2>
+                <span>Current session · up to 120 readings</span>
+              </div>
+              <label className="empty-text">
+                Metric{" "}
+                <select
+                  className="mb-4 max-w-full"
+                  value={selectedMetric}
+                  onChange={(event) => setSelectedMetric(event.target.value)}
+                >
+                  {asset.tagMappings
+                    .filter((m) => m.showAsMetric !== false)
+                    .map((m) => (
+                      <option key={m.nodeId} value={m.nodeId}>
+                        {m.label || m.tagName}
+                        {m.unit ? ` (${m.unit})` : ""}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              {history.some(
+                (point) => typeof point[selectedMetric] === "number",
+              ) ? (
+                <ResponsiveContainer width="100%" height={240}>
+                  <LineChart data={history}>
+                    <XAxis dataKey="time" stroke="#8fa9c4" />
+                    <YAxis stroke="#8fa9c4" />
+                    <Tooltip
+                      contentStyle={{
+                        background: "#0b1728",
+                        borderColor: "#1f354d",
+                      }}
+                    />
+                    <Line
+                      dataKey={(point) => point[selectedMetric]}
+                      name={
+                        asset.tagMappings.find(
+                          (m) => m.nodeId === selectedMetric,
+                        )?.label || selectedMetric
+                      }
+                      stroke="#38bdf8"
+                      dot={false}
+                      isAnimationActive={false}
+                      connectNulls={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="empty-text">
+                  Waiting for numeric PLC readings for this metric.
+                </p>
+              )}
+            </section>
+            <section className="panel">
+              <div className="panel-header">
+                <h2>Live Alarms</h2>
+              </div>
+              <p className="empty-text mb-3">
+                Current PLC states · refresh every 5 seconds
+              </p>
+              <LiveAlarmRules
+                rules={asset.alarmRules ?? []}
+                readings={readings}
+              />
+              <p className="empty-text mt-4 text-xs">
+                Session monitoring only. Alarm history and acknowledgement are
+                not connected yet.
+              </p>
+            </section>
+            <section className="panel">
+              <div className="panel-header">
+                <h2>Predictive Maintenance</h2>
+              </div>
+              <p className="empty-text">
+                Health and prediction models are not configured for this
+                equipment.
+              </p>
+            </section>
+          </div>
+        )}
       </div>
     </main>
   );

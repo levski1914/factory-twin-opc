@@ -119,6 +119,7 @@ export type IntegrationScalarFieldEnum = (typeof IntegrationScalarFieldEnum)[key
 
 
 export const AssetScalarFieldEnum = {
+  alarmRules: 'alarmRules',
   id: 'id',
   name: 'name',
   type: 'type',

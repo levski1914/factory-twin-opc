@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowDown, ArrowUp, Save, RefreshCw } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
+import { AlarmRulesEditor, LiveAlarmRules } from "../components/AlarmRules";
 import { EquipmentPreview } from "../components/EquipmentPreview";
 import {
   getAssets,
@@ -9,6 +10,7 @@ import {
   getSites,
   readEquipmentPreview,
   saveEquipment,
+  type AlarmRule,
   type Equipment,
   type Integration,
   type Metric,
@@ -71,6 +73,10 @@ export default function TagMappingPage() {
   const [name, setName] = useState("");
   const [type, setType] = useState("MOTOR");
   const [location, setLocation] = useState("");
+  const [alarmRules, setAlarmRules] = useState<AlarmRule[]>([]);
+  const [alarmTags, setAlarmTags] = useState<
+    Array<{ nodeId: string; tagName: string }>
+  >([]);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [readings, setReadings] = useState<PlcReading[]>([]);
   const [error, setError] = useState("");
@@ -101,6 +107,7 @@ export default function TagMappingPage() {
                 params.get("integrationId")),
           ) ?? connections[0];
         if (asset) {
+          setAlarmRules(asset.alarmRules ?? []);
           setEquipmentId(asset.id);
           setName(asset.name);
           setType(asset.type);
@@ -114,6 +121,7 @@ export default function TagMappingPage() {
             })),
           );
         }
+        setAlarmTags(loadDiscovered(connection?.id ?? ""));
         setIntegrationId(connection?.id ?? "");
         setSiteId(asset?.siteId ?? connection?.siteId ?? siteList[0]?.id ?? "");
       })
@@ -153,6 +161,8 @@ export default function TagMappingPage() {
 
   function chooseIntegration(id: string) {
     setIntegrationId(id);
+    setAlarmRules([]);
+    setAlarmTags(loadDiscovered(id));
     setReadings([]);
     setDrafts(loadDiscovered(id));
   }
@@ -207,10 +217,12 @@ export default function TagMappingPage() {
     setReadings([]);
     try {
       setReadings(
-        await readEquipmentPreview(
-          integrationId,
-          metrics.map((item) => item.nodeId),
-        ),
+        await readEquipmentPreview(integrationId, [
+          ...new Set([
+            ...metrics.map((item) => item.nodeId),
+            ...alarmRules.map((rule) => rule.nodeId).filter(Boolean),
+          ]),
+        ]),
       );
       setReadAt(new Date().toLocaleTimeString());
     } catch (reason) {
@@ -231,6 +243,7 @@ export default function TagMappingPage() {
         siteId,
         integrationId,
         mappings: metrics,
+        alarmRules: alarmRules.map((rule) => ({ ...rule, integrationId })),
       });
       navigate("/equipment/" + equipment.id);
     } catch (reason) {
@@ -271,7 +284,13 @@ export default function TagMappingPage() {
               !name.trim() ||
               !siteId ||
               !integrationId ||
-              metrics.length === 0
+              metrics.length === 0 ||
+              alarmRules.some(
+                (rule) =>
+                  !rule.name.trim() ||
+                  !rule.nodeId ||
+                  !Number.isFinite(rule.threshold),
+              )
             }
             className="flex items-center gap-2 rounded-xl bg-cyan-400 px-5 py-3 font-semibold text-slate-950 disabled:opacity-40"
           >
@@ -372,6 +391,53 @@ export default function TagMappingPage() {
                 </label>
               </div>
             </section>
+            <section className="panel space-y-3">
+              <a
+                className="block text-cyan-300"
+                target="_blank"
+                rel="noopener noreferrer"
+                href={
+                  "/integrations?integrationId=" +
+                  encodeURIComponent(integrationId) +
+                  (equipmentId
+                    ? "&assetId=" + encodeURIComponent(equipmentId)
+                    : "")
+                }
+              >
+                Browse tags from selected PLC ↗
+              </a>
+              <p className="text-sm text-slate-400">
+                Opens a separate tab to preserve your edits. Select and send
+                tags there, then return here and import them.
+              </p>
+              <button
+                type="button"
+                className="text-cyan-300"
+                onClick={() => setAlarmTags(loadDiscovered(integrationId))}
+              >
+                Import selected tags for alarms
+              </button>
+              <p className="text-xs text-slate-400">
+                {alarmTags.length} tags available for alarm binding. PLC name is
+                only needed when creating a new connection.
+              </p>
+            </section>
+            <AlarmRulesEditor
+              rules={alarmRules}
+              onChange={(rules) => {
+                setAlarmRules(rules);
+                setReadings([]);
+              }}
+              tags={Array.from(
+                new Map(
+                  [...drafts, ...alarmTags].map((tag) => [tag.nodeId, tag]),
+                ).values(),
+              )}
+              equipment={assets}
+              type={type}
+              equipmentId={equipmentId}
+              integrationId={integrationId}
+            />
             <section className="rounded-2xl border border-slate-700 bg-slate-900 p-6">
               <div className="mb-5 flex items-center justify-between gap-3">
                 <h2 className="text-lg font-semibold">
@@ -527,6 +593,10 @@ export default function TagMappingPage() {
                   : "Layout preview · values have not been read yet"
               }
             />
+            <section className="panel mt-4">
+              <h3 className="mb-3">Alarm preview</h3>
+              <LiveAlarmRules rules={alarmRules} readings={readings} />
+            </section>
             {editingMetric && (
               <fieldset
                 disabled={!canEdit || busy || reading}

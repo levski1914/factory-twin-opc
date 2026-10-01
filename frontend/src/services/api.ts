@@ -132,7 +132,17 @@ export type Metric = {
   displaySlot?: number;
   showAsMetric?: boolean;
 };
+export type AlarmRule = {
+  name: string;
+  nodeId: string;
+  tagName: string;
+  integrationId: string;
+  condition: "TRUE" | "FALSE" | "GT" | "LT" | "EQ" | "BIT_SET";
+  threshold: number;
+  severity: "WARNING" | "CRITICAL";
+};
 export type Equipment = {
+  alarmRules?: AlarmRule[];
   id: string;
   name: string;
   type: string;
@@ -166,6 +176,7 @@ export const saveEquipment = (data: {
   siteId: string;
   integrationId: string;
   mappings: Metric[];
+  alarmRules?: AlarmRule[];
 }) =>
   request<Equipment>("/tag-mapping/equipment", {
     method: "POST",
