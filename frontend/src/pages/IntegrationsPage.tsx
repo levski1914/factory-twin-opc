@@ -15,6 +15,7 @@ import {
   getSites,
   getIntegrations,
   saveIntegration,
+  deleteIntegration,
   type Site,
   type Integration,
 } from "../services/api";
@@ -31,6 +32,44 @@ export default function IntegrationsPage() {
   const [connectionName, setConnectionName] = useState("");
   const [integrationId, setIntegrationId] = useState("");
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const canEdit = ["OWNER", "ADMIN", "TECHNICIAN"].includes(user?.role ?? "");
+  async function handleDeleteIntegration() {
+    const selected = integrations.find((item) => item.id === integrationId);
+    if (
+      !selected ||
+      !window.confirm(
+        'Delete integration "' +
+          selected.name +
+          '"? Equipment using it will block deletion.',
+      )
+    )
+      return;
+    setDeleting(true);
+    try {
+      await deleteIntegration(selected.id);
+      setIntegrations((current) =>
+        current.filter((item) => item.id !== selected.id),
+      );
+      setIntegrationId("");
+      setConnectionName("");
+      resetBrowser();
+      try {
+        localStorage.removeItem(
+          "discoveredTags:" + user?.companyId + ":" + selected.id,
+        );
+      } catch {
+        /* Optional local cache. */
+      }
+      setStatusText("Integration deleted");
+    } catch (error) {
+      setStatusText(
+        error instanceof Error ? error.message : "Could not delete integration",
+      );
+    } finally {
+      setDeleting(false);
+    }
+  }
   useEffect(() => {
     Promise.all([getSites(), getIntegrations()])
       .then(([list, saved]) => {
@@ -323,6 +362,7 @@ export default function IntegrationsPage() {
             Saved integration
             <select
               className="rounded-xl border border-slate-700 bg-slate-950 p-3"
+              disabled={deleting}
               value={integrationId}
               onChange={(e) => {
                 const saved = integrations.find(
@@ -364,6 +404,7 @@ export default function IntegrationsPage() {
         </div>
         <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
           <input
+            disabled={Boolean(integrationId) || deleting}
             value={endpointUrl}
             onChange={(e) => {
               setEndpointUrl(e.target.value);
@@ -382,6 +423,23 @@ export default function IntegrationsPage() {
           </button>
         </div>
 
+        {integrationId && (
+          <div className="mt-4 flex flex-wrap items-center gap-4">
+            <p className="text-sm text-slate-400">
+              Use Browse below to add more tags to this saved PLC connection.
+            </p>
+            {canEdit && (
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => void handleDeleteIntegration()}
+                className="rounded-lg border border-red-500/40 px-4 py-2 text-sm text-red-300"
+              >
+                {deleting ? "Deleting…" : "Delete integration"}
+              </button>
+            )}
+          </div>
+        )}
         {!integrationId && (
           <div className="mt-4 flex flex-wrap gap-3">
             <input

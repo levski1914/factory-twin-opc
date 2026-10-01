@@ -190,3 +190,8 @@ export const readEquipmentPreview = (
     method: "POST",
     body: JSON.stringify({ integrationId, nodeIds }),
   });
+
+export const deleteIntegration = (id: string) =>
+  request<{ ok: boolean }>("/integrations/" + encodeURIComponent(id), {
+    method: "DELETE",
+  });

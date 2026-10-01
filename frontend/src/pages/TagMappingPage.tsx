@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowDown, ArrowUp, Save, RefreshCw } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { AlarmRulesEditor, LiveAlarmRules } from "../components/AlarmRules";
+import PlcTagPicker from "../components/PlcTagPicker";
 import { EquipmentPreview } from "../components/EquipmentPreview";
 import {
   getAssets,
@@ -391,37 +392,40 @@ export default function TagMappingPage() {
                 </label>
               </div>
             </section>
-            <section className="panel space-y-3">
-              <a
-                className="block text-cyan-300"
-                target="_blank"
-                rel="noopener noreferrer"
-                href={
-                  "/integrations?integrationId=" +
-                  encodeURIComponent(integrationId) +
-                  (equipmentId
-                    ? "&assetId=" + encodeURIComponent(equipmentId)
-                    : "")
+            {integrations.find((item) => item.id === integrationId) && (
+              <PlcTagPicker
+                key={integrationId}
+                integration={
+                  integrations.find((item) => item.id === integrationId)!
                 }
-              >
-                Browse tags from selected PLC ↗
-              </a>
-              <p className="text-sm text-slate-400">
-                Opens a separate tab to preserve your edits. Select and send
-                tags there, then return here and import them.
-              </p>
-              <button
-                type="button"
-                className="text-cyan-300"
-                onClick={() => setAlarmTags(loadDiscovered(integrationId))}
-              >
-                Import selected tags for alarms
-              </button>
-              <p className="text-xs text-slate-400">
-                {alarmTags.length} tags available for alarm binding. PLC name is
-                only needed when creating a new connection.
-              </p>
-            </section>
+                onAdd={(tag) => {
+                  setAlarmTags((current) =>
+                    current.some((item) => item.nodeId === tag.nodeId)
+                      ? current
+                      : [...current, tag],
+                  );
+                  setDrafts((current) =>
+                    current.some((item) => item.nodeId === tag.nodeId)
+                      ? current
+                      : [...current, { ...suggest(tag), enabled: false }],
+                  );
+                  const stored = loadDiscovered(integrationId);
+                  if (!stored.some((item) => item.nodeId === tag.nodeId)) {
+                    try {
+                      localStorage.setItem(
+                        "discoveredTags:" +
+                          user?.companyId +
+                          ":" +
+                          integrationId,
+                        JSON.stringify([...stored, tag]),
+                      );
+                    } catch {
+                      /* Tag is still available in this editor. */
+                    }
+                  }
+                }}
+              />
+            )}
             <AlarmRulesEditor
               rules={alarmRules}
               onChange={(rules) => {

@@ -2,6 +2,10 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
+  Param,
+  NotFoundException,
+  ConflictException,
   Get,
   Post,
   Query,
@@ -65,6 +69,60 @@ export class IntegrationsController {
       },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  @Delete(':id')
+  @Roles('OWNER', 'ADMIN', 'TECHNICIAN')
+  async remove(@Param('id') id: string, @CurrentUser() user: any) {
+    if (!user.companyId)
+      throw new BadRequestException('A company account is required');
+    try {
+      return await this.prisma.$transaction(
+        async (tx) => {
+          const integration = await tx.integration.findFirst({
+            where: { id, companyId: user.companyId },
+          });
+          if (!integration)
+            throw new NotFoundException('Integration not found');
+          const mappings = await tx.tagMapping.count({
+            where: { integrationId: id },
+          });
+          const assets = await tx.asset.findMany({
+            where: { companyId: user.companyId },
+            select: { alarmRules: true },
+          });
+          const alarmUse = assets.some(
+            (asset) =>
+              Array.isArray(asset.alarmRules) &&
+              asset.alarmRules.some(
+                (rule) =>
+                  rule &&
+                  typeof rule === 'object' &&
+                  !Array.isArray(rule) &&
+                  rule.integrationId === id,
+              ),
+          );
+          if (mappings || alarmUse)
+            throw new ConflictException(
+              'This integration is used by equipment or alarm tags. Reassign those tags before deleting it.',
+            );
+          await tx.integration.delete({ where: { id } });
+          return { ok: true };
+        },
+        { isolationLevel: 'Serializable' },
+      );
+    } catch (error) {
+      if (
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        ['P2003', 'P2034'].includes(String(error.code))
+      )
+        throw new ConflictException(
+          'Integration changed or is in use. Refresh and try again.',
+        );
+      throw error;
+    }
   }
 
   @Post('opcua/test')
