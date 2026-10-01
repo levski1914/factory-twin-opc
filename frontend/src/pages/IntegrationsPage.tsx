@@ -19,11 +19,12 @@ import {
   type Integration,
 } from "../services/api";
 import { useAuth } from "../auth/AuthContext";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 export default function IntegrationsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const [sites, setSites] = useState<Site[]>([]);
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [siteId, setSiteId] = useState("");
@@ -35,10 +36,18 @@ export default function IntegrationsPage() {
       .then(([list, saved]) => {
         setSites(list);
         setIntegrations(saved);
-        setSiteId(list[0]?.id ?? "");
+        const selected =
+          saved.find((item) => item.id === params.get("integrationId")) ??
+          (saved.length === 1 ? saved[0] : undefined);
+        setSiteId(selected?.siteId ?? list[0]?.id ?? "");
+        if (selected) {
+          setIntegrationId(selected.id);
+          setEndpointUrl(selected.endpointUrl);
+          setConnectionName(selected.name);
+        }
       })
       .catch((error) => setStatusText(error.message));
-  }, []);
+  }, [params]);
   function resetBrowser() {
     setConnected(false);
     setStatusText("Not connected");
@@ -132,7 +141,13 @@ export default function IntegrationsPage() {
       nodeId: node.nodeId,
     }));
     if (storeTags(selected))
-      navigate("/tag-mapping?integrationId=" + integrationId);
+      navigate(
+        "/tag-mapping?integrationId=" +
+          integrationId +
+          (params.get("assetId")
+            ? "&assetId=" + encodeURIComponent(params.get("assetId")!)
+            : ""),
+      );
   }
   async function handleTest() {
     setStatusText("Connecting...");
@@ -189,7 +204,13 @@ export default function IntegrationsPage() {
         { tagName: node.name.replace(/^\d+:/, ""), nodeId: node.nodeId },
       ])
     ) {
-      navigate("/tag-mapping?integrationId=" + integrationId);
+      navigate(
+        "/tag-mapping?integrationId=" +
+          integrationId +
+          (params.get("assetId")
+            ? "&assetId=" + encodeURIComponent(params.get("assetId")!)
+            : ""),
+      );
     }
   }
 

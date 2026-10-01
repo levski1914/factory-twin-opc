@@ -33,7 +33,7 @@ export default function Dashboard() {
           {!assets.length && <div className="empty-text">Connect a PLC and create your first equipment view. <Link to="/integrations">Open connections →</Link></div>}</div>
         </div>
         <div className="panel"><div className="panel-header"><h2>Equipment configuration</h2><span>{assets.length} assets</span></div><div className="asset-list">{assets.map(asset => <div className="equipment-list-row" key={asset.id}><div><strong>{asset.name}</strong><p className="empty-text">{asset.type} · {asset.tagMappings.length} tags</p></div><Link to={canEdit ? "/tag-mapping?assetId=" + asset.id : "/equipment/" + asset.id}>{canEdit ? "Edit cards" : "View"} →</Link></div>)}</div></div>
-        <div className="panel"><div className="panel-header"><h2>Alarms & Health</h2></div><p className="empty-text">Alarm rules and health calculations for configured equipment are not connected yet.</p></div>
+        <div className="panel"><div className="panel-header"><h2>Alarms & Health</h2></div><p className="empty-text">Configure alarm tags in the equipment editor and view their current states in the live view. Health calculations are not configured yet.</p></div>
         <div className="panel"><div className="panel-header"><h2>Trends & Analytics</h2></div><p className="empty-text">Open an equipment view to follow its live readings and session trend. Choose the metric you want to inspect.</p></div>
       </section></>}
     </main>

@@ -132,4 +132,23 @@ describe('Equipment ownership and configuration', () => {
     ).rejects.toThrow('Integration not found');
     expect(opcua.readNodes).not.toHaveBeenCalled();
   });
+  it('saves alarm tags separately from metric cards in the same transaction', async () => {
+    const { service, tx } = setup();
+    const alarmRules = [
+      {
+        name: 'Overload',
+        tagName: 'Motor1.Fault',
+        nodeId: 'ns=3;s=Motor1.Fault',
+        integrationId: 'plc-a',
+        condition: 'TRUE' as const,
+        threshold: 0,
+        severity: 'CRITICAL' as const,
+      },
+    ];
+    await service.saveEquipment('company-a', { ...draft, alarmRules });
+    expect(tx.asset.create.mock.calls[0][0].data.alarmRules).toEqual(
+      alarmRules,
+    );
+    expect(tx.tagMapping.createMany.mock.calls[0][0].data).toHaveLength(1);
+  });
 });

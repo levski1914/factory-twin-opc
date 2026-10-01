@@ -47,6 +47,7 @@ export type AssetMaxAggregateOutputType = {
 }
 
 export type AssetCountAggregateOutputType = {
+  alarmRules: number
   id: number
   name: number
   type: number
@@ -82,6 +83,7 @@ export type AssetMaxAggregateInputType = {
 }
 
 export type AssetCountAggregateInputType = {
+  alarmRules?: true
   id?: true
   name?: true
   type?: true
@@ -166,6 +168,7 @@ export type AssetGroupByArgs<ExtArgs extends runtime.Types.Extensions.InternalAr
 }
 
 export type AssetGroupByOutputType = {
+  alarmRules: runtime.JsonValue
   id: string
   name: string
   type: string
@@ -198,6 +201,7 @@ export type AssetWhereInput = {
   AND?: Prisma.AssetWhereInput | Prisma.AssetWhereInput[]
   OR?: Prisma.AssetWhereInput[]
   NOT?: Prisma.AssetWhereInput | Prisma.AssetWhereInput[]
+  alarmRules?: Prisma.JsonFilter<"Asset">
   id?: Prisma.StringFilter<"Asset"> | string
   name?: Prisma.StringFilter<"Asset"> | string
   type?: Prisma.StringFilter<"Asset"> | string
@@ -212,6 +216,7 @@ export type AssetWhereInput = {
 }
 
 export type AssetOrderByWithRelationInput = {
+  alarmRules?: Prisma.SortOrder
   id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   type?: Prisma.SortOrder
@@ -230,6 +235,7 @@ export type AssetWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.AssetWhereInput | Prisma.AssetWhereInput[]
   OR?: Prisma.AssetWhereInput[]
   NOT?: Prisma.AssetWhereInput | Prisma.AssetWhereInput[]
+  alarmRules?: Prisma.JsonFilter<"Asset">
   name?: Prisma.StringFilter<"Asset"> | string
   type?: Prisma.StringFilter<"Asset"> | string
   location?: Prisma.StringNullableFilter<"Asset"> | string | null
@@ -243,6 +249,7 @@ export type AssetWhereUniqueInput = Prisma.AtLeast<{
 }, "id">
 
 export type AssetOrderByWithAggregationInput = {
+  alarmRules?: Prisma.SortOrder
   id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   type?: Prisma.SortOrder
@@ -260,6 +267,7 @@ export type AssetScalarWhereWithAggregatesInput = {
   AND?: Prisma.AssetScalarWhereWithAggregatesInput | Prisma.AssetScalarWhereWithAggregatesInput[]
   OR?: Prisma.AssetScalarWhereWithAggregatesInput[]
   NOT?: Prisma.AssetScalarWhereWithAggregatesInput | Prisma.AssetScalarWhereWithAggregatesInput[]
+  alarmRules?: Prisma.JsonWithAggregatesFilter<"Asset">
   id?: Prisma.StringWithAggregatesFilter<"Asset"> | string
   name?: Prisma.StringWithAggregatesFilter<"Asset"> | string
   type?: Prisma.StringWithAggregatesFilter<"Asset"> | string
@@ -271,6 +279,7 @@ export type AssetScalarWhereWithAggregatesInput = {
 }
 
 export type AssetCreateInput = {
+  alarmRules?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   id?: string
   name: string
   type: string
@@ -283,6 +292,7 @@ export type AssetCreateInput = {
 }
 
 export type AssetUncheckedCreateInput = {
+  alarmRules?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   id?: string
   name: string
   type: string
@@ -295,6 +305,7 @@ export type AssetUncheckedCreateInput = {
 }
 
 export type AssetUpdateInput = {
+  alarmRules?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
@@ -307,6 +318,7 @@ export type AssetUpdateInput = {
 }
 
 export type AssetUncheckedUpdateInput = {
+  alarmRules?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
@@ -319,6 +331,7 @@ export type AssetUncheckedUpdateInput = {
 }
 
 export type AssetCreateManyInput = {
+  alarmRules?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   id?: string
   name: string
   type: string
@@ -330,6 +343,7 @@ export type AssetCreateManyInput = {
 }
 
 export type AssetUpdateManyMutationInput = {
+  alarmRules?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
@@ -339,6 +353,7 @@ export type AssetUpdateManyMutationInput = {
 }
 
 export type AssetUncheckedUpdateManyInput = {
+  alarmRules?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
@@ -350,6 +365,7 @@ export type AssetUncheckedUpdateManyInput = {
 }
 
 export type AssetCountOrderByAggregateInput = {
+  alarmRules?: Prisma.SortOrder
   id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   type?: Prisma.SortOrder
@@ -496,6 +512,7 @@ export type AssetUncheckedUpdateManyWithoutSiteNestedInput = {
 }
 
 export type AssetCreateWithoutTagMappingsInput = {
+  alarmRules?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   id?: string
   name: string
   type: string
@@ -507,6 +524,7 @@ export type AssetCreateWithoutTagMappingsInput = {
 }
 
 export type AssetUncheckedCreateWithoutTagMappingsInput = {
+  alarmRules?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   id?: string
   name: string
   type: string
@@ -534,6 +552,7 @@ export type AssetUpdateToOneWithWhereWithoutTagMappingsInput = {
 }
 
 export type AssetUpdateWithoutTagMappingsInput = {
+  alarmRules?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
@@ -545,6 +564,7 @@ export type AssetUpdateWithoutTagMappingsInput = {
 }
 
 export type AssetUncheckedUpdateWithoutTagMappingsInput = {
+  alarmRules?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
@@ -556,6 +576,7 @@ export type AssetUncheckedUpdateWithoutTagMappingsInput = {
 }
 
 export type AssetCreateWithoutCompanyInput = {
+  alarmRules?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   id?: string
   name: string
   type: string
@@ -567,6 +588,7 @@ export type AssetCreateWithoutCompanyInput = {
 }
 
 export type AssetUncheckedCreateWithoutCompanyInput = {
+  alarmRules?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   id?: string
   name: string
   type: string
@@ -607,6 +629,7 @@ export type AssetScalarWhereInput = {
   AND?: Prisma.AssetScalarWhereInput | Prisma.AssetScalarWhereInput[]
   OR?: Prisma.AssetScalarWhereInput[]
   NOT?: Prisma.AssetScalarWhereInput | Prisma.AssetScalarWhereInput[]
+  alarmRules?: Prisma.JsonFilter<"Asset">
   id?: Prisma.StringFilter<"Asset"> | string
   name?: Prisma.StringFilter<"Asset"> | string
   type?: Prisma.StringFilter<"Asset"> | string
@@ -618,6 +641,7 @@ export type AssetScalarWhereInput = {
 }
 
 export type AssetCreateWithoutSiteInput = {
+  alarmRules?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   id?: string
   name: string
   type: string
@@ -629,6 +653,7 @@ export type AssetCreateWithoutSiteInput = {
 }
 
 export type AssetUncheckedCreateWithoutSiteInput = {
+  alarmRules?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   id?: string
   name: string
   type: string
@@ -666,6 +691,7 @@ export type AssetUpdateManyWithWhereWithoutSiteInput = {
 }
 
 export type AssetCreateManyCompanyInput = {
+  alarmRules?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   id?: string
   name: string
   type: string
@@ -676,6 +702,7 @@ export type AssetCreateManyCompanyInput = {
 }
 
 export type AssetUpdateWithoutCompanyInput = {
+  alarmRules?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
@@ -687,6 +714,7 @@ export type AssetUpdateWithoutCompanyInput = {
 }
 
 export type AssetUncheckedUpdateWithoutCompanyInput = {
+  alarmRules?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
@@ -698,6 +726,7 @@ export type AssetUncheckedUpdateWithoutCompanyInput = {
 }
 
 export type AssetUncheckedUpdateManyWithoutCompanyInput = {
+  alarmRules?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
@@ -708,6 +737,7 @@ export type AssetUncheckedUpdateManyWithoutCompanyInput = {
 }
 
 export type AssetCreateManySiteInput = {
+  alarmRules?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   id?: string
   name: string
   type: string
@@ -718,6 +748,7 @@ export type AssetCreateManySiteInput = {
 }
 
 export type AssetUpdateWithoutSiteInput = {
+  alarmRules?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
@@ -729,6 +760,7 @@ export type AssetUpdateWithoutSiteInput = {
 }
 
 export type AssetUncheckedUpdateWithoutSiteInput = {
+  alarmRules?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
@@ -740,6 +772,7 @@ export type AssetUncheckedUpdateWithoutSiteInput = {
 }
 
 export type AssetUncheckedUpdateManyWithoutSiteInput = {
+  alarmRules?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
@@ -781,6 +814,7 @@ export type AssetCountOutputTypeCountTagMappingsArgs<ExtArgs extends runtime.Typ
 
 
 export type AssetSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
+  alarmRules?: boolean
   id?: boolean
   name?: boolean
   type?: boolean
@@ -796,6 +830,7 @@ export type AssetSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
 }, ExtArgs["result"]["asset"]>
 
 export type AssetSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
+  alarmRules?: boolean
   id?: boolean
   name?: boolean
   type?: boolean
@@ -809,6 +844,7 @@ export type AssetSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
 }, ExtArgs["result"]["asset"]>
 
 export type AssetSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
+  alarmRules?: boolean
   id?: boolean
   name?: boolean
   type?: boolean
@@ -822,6 +858,7 @@ export type AssetSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
 }, ExtArgs["result"]["asset"]>
 
 export type AssetSelectScalar = {
+  alarmRules?: boolean
   id?: boolean
   name?: boolean
   type?: boolean
@@ -832,7 +869,7 @@ export type AssetSelectScalar = {
   updatedAt?: boolean
 }
 
-export type AssetOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "type" | "location" | "companyId" | "siteId" | "createdAt" | "updatedAt", ExtArgs["result"]["asset"]>
+export type AssetOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"alarmRules" | "id" | "name" | "type" | "location" | "companyId" | "siteId" | "createdAt" | "updatedAt", ExtArgs["result"]["asset"]>
 export type AssetInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   company?: boolean | Prisma.Asset$companyArgs<ExtArgs>
   site?: boolean | Prisma.Asset$siteArgs<ExtArgs>
@@ -856,6 +893,7 @@ export type $AssetPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     tagMappings: Prisma.$TagMappingPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
+    alarmRules: runtime.JsonValue
     id: string
     name: string
     type: string
@@ -947,8 +985,8 @@ export interface AssetDelegate<ExtArgs extends runtime.Types.Extensions.Internal
    * // Get first 10 Assets
    * const assets = await prisma.asset.findMany({ take: 10 })
    * 
-   * // Only select the `id`
-   * const assetWithIdOnly = await prisma.asset.findMany({ select: { id: true } })
+   * // Only select the `alarmRules`
+   * const assetWithAlarmRulesOnly = await prisma.asset.findMany({ select: { alarmRules: true } })
    * 
    */
   findMany<T extends AssetFindManyArgs>(args?: Prisma.SelectSubset<T, AssetFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AssetPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
@@ -992,9 +1030,9 @@ export interface AssetDelegate<ExtArgs extends runtime.Types.Extensions.Internal
    *   ]
    * })
    * 
-   * // Create many Assets and only return the `id`
-   * const assetWithIdOnly = await prisma.asset.createManyAndReturn({
-   *   select: { id: true },
+   * // Create many Assets and only return the `alarmRules`
+   * const assetWithAlarmRulesOnly = await prisma.asset.createManyAndReturn({
+   *   select: { alarmRules: true },
    *   data: [
    *     // ... provide data here
    *   ]
@@ -1083,9 +1121,9 @@ export interface AssetDelegate<ExtArgs extends runtime.Types.Extensions.Internal
    *   ]
    * })
    * 
-   * // Update zero or more Assets and only return the `id`
-   * const assetWithIdOnly = await prisma.asset.updateManyAndReturn({
-   *   select: { id: true },
+   * // Update zero or more Assets and only return the `alarmRules`
+   * const assetWithAlarmRulesOnly = await prisma.asset.updateManyAndReturn({
+   *   select: { alarmRules: true },
    *   where: {
    *     // ... provide filter here
    *   },
@@ -1290,6 +1328,7 @@ export interface Prisma__AssetClient<T, Null = never, ExtArgs extends runtime.Ty
  * Fields of the Asset model
  */
 export interface AssetFieldRefs {
+  readonly alarmRules: Prisma.FieldRef<"Asset", 'Json'>
   readonly id: Prisma.FieldRef<"Asset", 'String'>
   readonly name: Prisma.FieldRef<"Asset", 'String'>
   readonly type: Prisma.FieldRef<"Asset", 'String'>
