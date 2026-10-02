@@ -62,3 +62,11 @@ The same roles used by the app define recipients; OWNER is the management/CEO de
 TypeScript/frontend and Nest backend builds; unit tests for delays, short spikes, hysteresis, bad-quality samples, signal loss, load criteria and stable recovery; mocked backend workflow covering confirmation, claim, unsuccessful repair, stopped equipment, successful repair, evidence and tenant/assignee authorization.
 
 The migration and the full UI/PLC workflow still require validation against your local PostgreSQL and PLC setup. No live database or PLC was available in the development workspace.
+
+## Monitoring setup and repeated task actions
+
+The equipment editor labels monitoring as “Watch this equipment and notify the team”. Running feedback and working-load selection are separate from alarm rules. Numeric running/load limits and verification duration are in expandable settings; the effective criteria remain visible in the review summary. The initial load value is in the selected tag's units and must be reviewed for each machine. Tag-name warnings are hints, not validation of PLC types.
+
+Alarm setup separates PLC boolean flags, measured-value limits, and code/bit rules. Switching source type clears the old tag selection. Existing rules retain their settings.
+
+Repeated CLAIM requests from the current assignee on an IN_PROGRESS task return the existing task without another event or notification. The UI immediately displays the returned state and guards double submission. Resuming a failed repair and a supervisor taking over remain real transitions. Historical duplicate notifications are retained and can be marked read. No database migration is required for this update.

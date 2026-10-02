@@ -102,10 +102,9 @@ export function AlarmRulesEditor({
   }
   return (
     <section className="rounded-2xl border border-slate-700 bg-slate-900 p-6">
-      <h2 className="text-lg font-semibold">Alarm tags · {rules.length}</h2>
+      <h2 className="text-lg font-semibold">When should this equipment raise an alarm? · {rules.length}</h2>
       <p className="my-3 text-sm text-slate-400">
-        Separate from metric cards. These rules display PLC alarm states while
-        the live view is open. They do not write to the PLC.
+        Choose a ready-made alarm from the PLC, or define a limit on a measured value. A metric card alone does not raise an alarm. Continuous monitoring creates tasks and notifications when a rule is confirmed; these rules never write to the PLC.
       </p>
       <label className="grid gap-2 text-sm">
         Copy alarm template from another {type.toLowerCase()}
@@ -149,6 +148,20 @@ export function AlarmRulesEditor({
           className="my-4 grid gap-3 rounded-xl border border-slate-600 p-4"
         >
           <label className="grid gap-2 text-sm">
+            1. Where does the alarm decision come from?
+            <select className={input} value={["TRUE", "FALSE"].includes(rule.condition) ? "PLC" : ["GT", "LT"].includes(rule.condition) ? "VALUE" : "CODE"}
+              onChange={e => update(index, { condition: e.target.value === "PLC" ? "TRUE" : e.target.value === "VALUE" ? "GT" : "EQ", nodeId: "", tagName: "", threshold: 0, resetThreshold: undefined })}>
+              <option value="PLC">PLC alarm signal (on / off)</option>
+              <option value="VALUE">Measured value crosses a limit</option>
+              <option value="CODE">Advanced: alarm code / bit</option>
+            </select>
+          </label>
+          <p className="text-sm text-slate-400">{["TRUE", "FALSE"].includes(rule.condition)
+            ? "The PLC decides whether the alarm is active. Select an alarm flag such as Alarm_High_Temp. If it remains FALSE, a TRUE rule stays inactive even when the temperature card is high."
+            : ["GT", "LT"].includes(rule.condition)
+              ? "FactoryTwin compares the actual measurement with your limit. Select a numeric tag such as Motor_Temp_C, not Alarm_High_Temp. Enter a limit from the equipment specification, in the tag’s units."
+              : "Use the PLC documentation to select the alarm code or the bit position in an alarm word."}</p>
+          <label className="grid gap-2 text-sm">
             Alarm name
             <input
               className={input}
@@ -158,7 +171,7 @@ export function AlarmRulesEditor({
             />
           </label>
           <label className="grid gap-2 text-sm">
-            PLC tag
+            2. Which PLC signal should be checked?
             <select
               className={input}
               value={rule.nodeId}
@@ -204,7 +217,7 @@ export function AlarmRulesEditor({
                   ["LT", "Less than"],
                   ["EQ", "Equals code"],
                   ["BIT_SET", "Bit is set (32-bit word)"],
-                ].map(([value, label]) => (
+                ].filter(([value]) => ["TRUE", "FALSE"].includes(rule.condition) ? ["TRUE", "FALSE"].includes(value) : ["GT", "LT"].includes(rule.condition) ? ["GT", "LT"].includes(value) : ["EQ", "BIT_SET"].includes(value)).map(([value, label]) => (
                   <option value={value} key={value}>
                     {label}
                   </option>
@@ -242,6 +255,12 @@ export function AlarmRulesEditor({
               />
             </label>
           )}
+          <p className="rounded-lg bg-slate-950 p-3 text-sm">
+            Rule: {rule.tagName || "choose a signal"} {({TRUE: "is TRUE", FALSE: "is FALSE", GT: "is greater than", LT: "is less than", EQ: "equals code", BIT_SET: "has set bit"})[rule.condition]}{!["TRUE", "FALSE"].includes(rule.condition) ? ` ${rule.threshold}` : ""}. Confirm after {rule.delaySeconds ?? 10}s of observed deviation; recover after {rule.clearSeconds ?? 5}s of clear readings. Severity: {rule.severity}.
+          </p>
+          <details className="rounded-lg border border-slate-700 p-3">
+          <summary className="cursor-pointer text-sky-300">Timing and recovery settings</summary>
+          <p className="my-3 text-sm text-slate-400">Confirmation filters short spikes. Recovery time avoids repeated alarms around the limit. An optional recovery limit requires a larger return toward normal before clearing. Choose timings for this process; 0 seconds confirms on the first observed active sample.</p>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="grid gap-2 text-sm">
               Confirm after (seconds)
@@ -288,6 +307,7 @@ export function AlarmRulesEditor({
               />
             </label>
           )}
+          </details>
           <button
             type="button"
             className="text-left text-sm text-red-300"
@@ -316,7 +336,7 @@ export function AlarmRulesEditor({
           ])
         }
       >
-        + Add alarm tag
+        + Add alarm rule
       </button>
     </section>
   );

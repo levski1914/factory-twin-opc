@@ -402,6 +402,10 @@ export class MonitoringService implements OnModuleInit, OnModuleDestroy {
       if (body.action === 'CLAIM') {
         if (task.status === 'VERIFYING')
           throw new ConflictException('Verification is in progress');
+        // Repeated clicks and retried requests must not create new events.
+        // This check runs under the same asset lock as the state transition.
+        if (task.status === 'IN_PROGRESS' && task.assigneeId === user.id)
+          return task;
         const updated = await tx.maintenanceCase.update({
           where: { id },
           data: {
@@ -414,7 +418,7 @@ export class MonitoringService implements OnModuleInit, OnModuleDestroy {
           tx,
           updated,
           'CLAIMED',
-          `${name} accepted the task.`,
+          `${task.assetName}: ${name} accepted responsibility for the repair.`,
           { actorId: user.id },
           true,
         );

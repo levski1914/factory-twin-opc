@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import {
@@ -153,7 +153,10 @@ export function Notifications({ data }: { data: MonitorOverview | null }) {
     </section>
   );
 }
-function Task({ task }: { task: MaintenanceCase }) {
+function Task({ task: incomingTask }: { task: MaintenanceCase }) {
+  const [task, setTask] = useState(incomingTask);
+  useEffect(() => setTask(incomingTask), [incomingTask]);
+  const submitting = useRef(false);
   const { user } = useAuth();
   const [note, setNote] = useState("");
   const [repairAction, setRepairAction] = useState("REPAIRED");
@@ -166,15 +169,19 @@ function Task({ task }: { task: MaintenanceCase }) {
       !task.assigneeId ||
       task.assigneeId === user?.id);
   async function act(action: "CLAIM" | "REPORT") {
+    if (submitting.current) return;
+    submitting.current = true;
     setBusy(true);
     setError("");
     try {
-      await updateMaintenanceCase(task.id, { action, note, repairAction });
+      const updated = await updateMaintenanceCase(task.id, { action, note, repairAction });
+      setTask(updated);
       setNote("");
       if (events) setEvents((await getMaintenanceCase(task.id)).events);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Action failed");
     } finally {
+      submitting.current = false;
       setBusy(false);
     }
   }
@@ -224,12 +231,13 @@ function Task({ task }: { task: MaintenanceCase }) {
       )}
       {canEdit && !["RESOLVED", "VERIFYING"].includes(task.status) && (
         <fieldset disabled={busy} className="my-3 grid gap-3">
-          <button
+          {(task.status !== "IN_PROGRESS" || task.assigneeId !== user?.id) && <button
             className="text-left text-cyan-300"
             onClick={() => void act("CLAIM")}
           >
-            Accept task / resume work
-          </button>
+            {task.status === "VERIFICATION_FAILED" ? "Resume repair work" : task.assigneeId ? "Take over responsibility" : "Accept responsibility"}
+          </button>}
+          <p className="text-sm text-slate-400">{task.status === "IN_PROGRESS" && task.assigneeId === user?.id ? "You are responsible for this repair. " : "Accepting assigns responsibility and informs management. "}When the work is complete, describe it below. The system will then check the measurements before closing the task.</p>
           <select
             className="rounded-lg bg-slate-950 p-2"
             value={repairAction}
@@ -350,24 +358,24 @@ export function MonitoringEditor({
   const input = "rounded-lg bg-slate-950 p-3 w-full";
   return (
     <section className="panel space-y-4">
-      <h2>Continuous monitoring & repair verification</h2>
+      <h2>Automatic monitoring</h2>
       <label>
         <input
           type="checkbox"
           checked={value.enabled}
           onChange={(e) => onChange({ ...value, enabled: e.target.checked })}
         />{" "}
-        Enable backend monitoring
+        Watch this equipment and notify the team
       </label>
       <p className="text-sm text-slate-400">
-        Monitoring continues while the backend runs, even with the browser
-        closed. Set alarm confirmation delays below. An open maintenance task
-        locks equipment configuration until verification passes.
+        Alarm rules below decide when a problem is confirmed and a maintenance task opens. Monitoring continues with the browser closed while the server runs. An open task locks these settings until verification passes.
       </p>
       {value.enabled && (
         <>
+          <h3 className="font-semibold">How do we confirm a repair?</h3>
+          <p className="text-sm text-slate-300">A stopped motor may cool down without being repaired. Select signals that show this equipment is running and doing work. These checks apply after a repair report; they do not prevent an alarm from opening.</p>
           <label className="grid gap-2">
-            Running signal
+            1. Which signal proves the equipment is running?
             <select
               className={input}
               value={value.runNodeId}
@@ -383,7 +391,7 @@ export function MonitoringEditor({
               ))}
             </select>
           </label>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <label className="grid gap-2 text-sm">What kind of running signal is this?
             <select
               aria-label="Running condition"
               className={input}
@@ -395,23 +403,12 @@ export function MonitoringEditor({
                 })
               }
             >
-              <option value="TRUE">Running = TRUE / 1</option>
-              <option value="GT">Running value greater than</option>
+              <option value="TRUE">On / off feedback — ON means running</option>
+              <option value="GT">Speed measurement — above a minimum means running</option>
             </select>
-            {value.runCondition === "GT" && (
-              <input
-                aria-label="Running threshold"
-                className={input}
-                type="number"
-                value={value.runThreshold}
-                onChange={(e) =>
-                  onChange({ ...value, runThreshold: e.target.valueAsNumber })
-                }
-              />
-            )}
-          </div>
+          </label>
           <label className="grid gap-2">
-            Load signal
+            2. Which measurement proves it is doing work?
             <select
               className={input}
               value={value.loadNodeId}
@@ -427,8 +424,22 @@ export function MonitoringEditor({
               ))}
             </select>
           </label>
+          <details className="rounded-lg border border-slate-700 p-3">
+            <summary className="cursor-pointer text-sky-300">Adjust running, load and verification limits</summary>
+            <p className="my-3 text-sm text-slate-400">Review these values for this machine before saving. Load is measured in the selected tag’s units: 10 means 10% for a percent tag, but 10 A for a current tag.</p>
+            {value.runCondition === "GT" && (
+              <input
+                aria-label="Minimum running speed"
+                className={input}
+                type="number"
+                value={value.runThreshold}
+                onChange={(e) =>
+                  onChange({ ...value, runThreshold: e.target.valueAsNumber })
+                }
+              />
+            )}
           <label className="grid gap-2">
-            Load must be greater than (tag units)
+            Minimum working load (in the selected signal’s units)
             <input
               className={input}
               type="number"
@@ -440,7 +451,7 @@ export function MonitoringEditor({
             />
           </label>
           <label className="grid gap-2">
-            Stable verification window (seconds)
+            3. How long must readings remain stable? (seconds)
             <input
               className={input}
               type="number"
@@ -455,6 +466,17 @@ export function MonitoringEditor({
               }
             />
           </label>
+          </details>
+          <p className="text-sm text-slate-400">Use a running feedback signal with TRUE, or a speed measurement with “greater than”. For load, use a numeric load/current measurement, not an alarm flag. Set the minimum for this machine’s normal operating conditions.</p>
+          {value.runNodeId && value.runNodeId === value.loadNodeId && <p role="alert" className="text-amber-300">The same tag is selected for running and load. Check that it really proves both conditions; an alarm flag cannot measure working load.</p>}
+          {[value.runNodeId, value.loadNodeId].some(id => /alarm|fault|trip/i.test(availableTags.find(t => t.nodeId === id)?.tagName ?? "")) && <p role="alert" className="text-amber-300">A selected tag name looks like an alarm. Check the PLC definition: these fields need running feedback and a numeric working-load measurement.</p>}
+          <div className="rounded-lg bg-slate-950 p-3 text-sm space-y-2">
+            <strong>Repair check — review before saving</strong>
+            <p>Running: {availableTags.find(t => t.nodeId === value.runNodeId)?.tagName || "not selected"} {value.runCondition === "TRUE" ? "must be ON" : `must exceed ${value.runThreshold}`}.</p>
+            <p>Working load: {availableTags.find(t => t.nodeId === value.loadNodeId)?.tagName || "not selected"} must exceed {value.minimumLoad} in the tag’s units.</p>
+            <p>All alarm rules must recover and stay clear for {value.verificationSeconds} seconds while these conditions hold.</p>
+          </div>
+          <p className="text-sm text-slate-400">After a repair report: wait for running feedback and sufficient load → check all alarm rules have recovered → require {value.verificationSeconds} seconds of stable readings → close the task. Missing data pauses the check.</p>
           <p className="text-xs text-amber-200">
             Set meaningful criteria for this equipment. Passing these checks
             confirms the configured signals, not every possible mechanical

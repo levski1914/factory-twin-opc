@@ -159,6 +159,20 @@ describe('Backend maintenance lifecycle with simulated PLC readings', () => {
       s.events.find((e) => e.kind === 'REPAIR_REPORTED').evidence.snapshot,
     ).toBeTruthy();
   });
+  it('treats repeated acceptance as one transition but allows resuming failed repairs', async () => {
+    const s = setup();
+    for (let t = 1000; t <= 11000; t += 1000) await s.sample(t, 120);
+    await s.service.action(user, 'case-0', { action: 'CLAIM' });
+    const count = s.notifications.length;
+    for (let i = 0; i < 5; i++)
+      await s.service.action(user, 'case-0', { action: 'CLAIM' });
+    expect(s.events.filter(e => e.kind === 'CLAIMED')).toHaveLength(1);
+    expect(s.notifications).toHaveLength(count);
+    s.cases[0].status = 'VERIFICATION_FAILED';
+    await s.service.action(user, 'case-0', { action: 'CLAIM' });
+    expect(s.cases[0].status).toBe('IN_PROGRESS');
+    expect(s.events.filter(e => e.kind === 'CLAIMED')).toHaveLength(2);
+  });
   it('scopes task actions to the company and assigned engineer', async () => {
     const s = setup();
     for (let t = 1000; t <= 11000; t += 1000) await s.sample(t, 120);
