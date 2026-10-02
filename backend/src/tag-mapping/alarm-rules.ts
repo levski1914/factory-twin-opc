@@ -1,5 +1,8 @@
 import { BadRequestException } from '@nestjs/common';
 export type AlarmRule = {
+  delaySeconds?: number;
+  clearSeconds?: number;
+  resetThreshold?: number;
   name: string;
   nodeId: string;
   tagName: string;
@@ -15,6 +18,20 @@ export function validateAlarmRules(
   if (!Array.isArray(value) || value.length > 64)
     throw new BadRequestException('Provide at most 64 alarm rules');
   return value.map((rule) => {
+    if (
+      rule &&
+      ([rule.delaySeconds, rule.clearSeconds].some(
+        (v) => v !== undefined && (!Number.isInteger(v) || v < 0 || v > 3600),
+      ) ||
+        (rule.resetThreshold !== undefined &&
+          (!Number.isFinite(rule.resetThreshold) ||
+            !['GT', 'LT'].includes(rule.condition) ||
+            (rule.condition === 'GT' && rule.resetThreshold > rule.threshold) ||
+            (rule.condition === 'LT' && rule.resetThreshold < rule.threshold))))
+    )
+      throw new BadRequestException(
+        'Invalid confirmation/recovery delay or reset threshold',
+      );
     if (
       !rule ||
       typeof rule.name !== 'string' ||
@@ -42,6 +59,15 @@ export function validateAlarmRules(
         'Each alarm needs a name, PLC tag, valid condition and severity; bit index must be 0–31',
       );
     return {
+      ...(rule.delaySeconds !== undefined
+        ? { delaySeconds: rule.delaySeconds }
+        : {}),
+      ...(rule.clearSeconds !== undefined
+        ? { clearSeconds: rule.clearSeconds }
+        : {}),
+      ...(rule.resetThreshold !== undefined
+        ? { resetThreshold: rule.resetThreshold }
+        : {}),
       name: rule.name.trim(),
       nodeId: rule.nodeId.trim(),
       tagName: rule.tagName.trim(),

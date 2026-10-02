@@ -4,6 +4,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { validateAlarmRules, type AlarmRule } from './alarm-rules';
+import {
+  validateMonitoring,
+  type MonitoringConfig,
+} from '../monitoring/monitor-engine';
 import { PrismaService } from '../prisma/prisma.service';
 import { OpcuaService } from '../integrations/opcua/opcua.service';
 
@@ -29,6 +33,7 @@ export type EquipmentInput = {
   integrationId: string;
   mappings: MetricInput[];
   alarmRules?: AlarmRule[];
+  monitoring?: MonitoringConfig;
 };
 
 @Injectable()
@@ -120,6 +125,10 @@ export class TagMappingService {
         'Provide name, equipment type, site and integration',
       );
     }
+    const monitoring =
+      body.monitoring === undefined
+        ? undefined
+        : validateMonitoring(body.monitoring);
     const mappings = this.validateMappings(body.mappings);
     const alarmRules =
       body.alarmRules === undefined
@@ -135,6 +144,17 @@ export class TagMappingService {
         'Select at most 64 distinct PLC tags across metrics and alarms',
       );
     return this.prisma.$transaction(async (tx) => {
+      if (body.id) {
+        await tx.$queryRaw`SELECT 1 FROM pg_advisory_xact_lock(hashtext(${body.id}))`;
+        if (
+          await tx.maintenanceCase.count({
+            where: { assetId: body.id, companyId, openKey: body.id },
+          })
+        )
+          throw new BadRequestException(
+            'An open maintenance task exists. Complete repair verification before changing equipment configuration.',
+          );
+      }
       const site = await tx.site.findFirst({
         where: { id: body.siteId, companyId },
       });
@@ -170,7 +190,32 @@ export class TagMappingService {
             'Select at most 64 distinct PLC tags across metrics and alarms',
           );
       }
+      const oldAsset = body.id
+        ? await tx.asset.findFirst({ where: { id: body.id, companyId } })
+        : null;
+      const effectiveConfig =
+        monitoring ?? (oldAsset?.monitoring as unknown as MonitoringConfig);
+      const effectiveRules =
+        alarmRules ?? ((oldAsset?.alarmRules ?? []) as AlarmRule[]);
+      if (effectiveConfig?.enabled) {
+        if (!effectiveRules.length)
+          throw new BadRequestException(
+            'Add at least one alarm before enabling monitoring',
+          );
+        if (
+          new Set([
+            ...mappings.map((m) => m.nodeId),
+            ...effectiveRules.map((r) => r.nodeId),
+            effectiveConfig.runNodeId,
+            effectiveConfig.loadNodeId,
+          ]).size > 64
+        )
+          throw new BadRequestException(
+            'At most 64 distinct PLC tags including verification tags',
+          );
+      }
       const data = {
+        ...(monitoring !== undefined ? { monitoring } : {}),
         ...(alarmRules !== undefined ? { alarmRules } : {}),
         name: body.name.trim(),
         type: body.type,

@@ -57,6 +57,7 @@ model Integration {
 }
 
 model Asset {
+  monitoring Json @default("{}")
   alarmRules Json @default("[]")
   id        String   @id @default(cuid())
   name      String
@@ -149,4 +150,55 @@ model Site {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model MonitorSnapshot {
+  assetId String @id
+  companyId String
+  payload Json
+  updatedAt DateTime @updatedAt
+  @@index([companyId])
+}
+model MaintenanceCase {
+  id String @id @default(cuid())
+  assetId String
+  companyId String
+  openKey String? @unique
+  assetName String
+  status String @default("OPEN")
+  severity String
+  assigneeId String?
+  assigneeName String?
+  reportedBy String?
+  reportedName String?
+  reportNote String?
+  repairAction String?
+  reportedAt DateTime?
+  verificationSince DateTime?
+  failureSince DateTime?
+  resolvedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([companyId, status])
+  @@index([assetId, createdAt])
+}
+model MaintenanceEvent {
+  id String @id @default(cuid())
+  caseId String
+  companyId String
+  kind String
+  message String
+  evidence Json
+  createdAt DateTime @default(now())
+  @@index([caseId, createdAt])
+}
+model MonitorNotification {
+  id String @id @default(cuid())
+  companyId String
+  userId String
+  caseId String
+  message String
+  readAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([companyId, userId, createdAt])
 }

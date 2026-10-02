@@ -1,0 +1,11 @@
+ALTER TABLE "Asset" ADD COLUMN "monitoring" JSONB NOT NULL DEFAULT '{}';
+CREATE TABLE "MonitorSnapshot" ("assetId" TEXT PRIMARY KEY, "companyId" TEXT NOT NULL, "payload" JSONB NOT NULL, "updatedAt" TIMESTAMP(3) NOT NULL);
+CREATE INDEX "MonitorSnapshot_companyId_idx" ON "MonitorSnapshot"("companyId");
+CREATE TABLE "MaintenanceCase" ("id" TEXT PRIMARY KEY, "assetId" TEXT NOT NULL, "companyId" TEXT NOT NULL, "openKey" TEXT, "assetName" TEXT NOT NULL, "status" TEXT NOT NULL DEFAULT 'OPEN', "severity" TEXT NOT NULL, "assigneeId" TEXT, "assigneeName" TEXT, "reportedBy" TEXT, "reportedName" TEXT, "reportNote" TEXT, "repairAction" TEXT, "reportedAt" TIMESTAMP(3), "verificationSince" TIMESTAMP(3), "failureSince" TIMESTAMP(3), "resolvedAt" TIMESTAMP(3), "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL);
+CREATE UNIQUE INDEX "MaintenanceCase_openKey_key" ON "MaintenanceCase"("openKey");
+CREATE INDEX "MaintenanceCase_companyId_status_idx" ON "MaintenanceCase"("companyId", "status");
+CREATE INDEX "MaintenanceCase_assetId_createdAt_idx" ON "MaintenanceCase"("assetId", "createdAt");
+CREATE TABLE "MaintenanceEvent" ("id" TEXT PRIMARY KEY, "caseId" TEXT NOT NULL, "companyId" TEXT NOT NULL, "kind" TEXT NOT NULL, "message" TEXT NOT NULL, "evidence" JSONB NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE INDEX "MaintenanceEvent_caseId_createdAt_idx" ON "MaintenanceEvent"("caseId", "createdAt");
+CREATE TABLE "MonitorNotification" ("id" TEXT PRIMARY KEY, "companyId" TEXT NOT NULL, "userId" TEXT NOT NULL, "caseId" TEXT NOT NULL, "message" TEXT NOT NULL, "readAt" TIMESTAMP(3), "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE INDEX "MonitorNotification_companyId_userId_createdAt_idx" ON "MonitorNotification"("companyId", "userId", "createdAt");

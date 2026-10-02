@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowDown, ArrowUp, Save, RefreshCw } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { AlarmRulesEditor, LiveAlarmRules } from "../components/AlarmRules";
+import { MonitoringEditor, defaultMonitoring } from "../components/Monitoring";
 import PlcTagPicker from "../components/PlcTagPicker";
 import { EquipmentPreview } from "../components/EquipmentPreview";
 import {
@@ -74,6 +75,7 @@ export default function TagMappingPage() {
   const [name, setName] = useState("");
   const [type, setType] = useState("MOTOR");
   const [location, setLocation] = useState("");
+  const [monitoring, setMonitoring] = useState(defaultMonitoring);
   const [alarmRules, setAlarmRules] = useState<AlarmRule[]>([]);
   const [alarmTags, setAlarmTags] = useState<
     Array<{ nodeId: string; tagName: string }>
@@ -108,6 +110,7 @@ export default function TagMappingPage() {
                 params.get("integrationId")),
           ) ?? connections[0];
         if (asset) {
+          setMonitoring({ ...defaultMonitoring, ...asset.monitoring });
           setAlarmRules(asset.alarmRules ?? []);
           setEquipmentId(asset.id);
           setName(asset.name);
@@ -161,6 +164,7 @@ export default function TagMappingPage() {
   }, [loading, equipmentId, integrationId, user?.companyId]);
 
   function chooseIntegration(id: string) {
+    setMonitoring(defaultMonitoring);
     setIntegrationId(id);
     setAlarmRules([]);
     setAlarmTags(loadDiscovered(id));
@@ -244,6 +248,7 @@ export default function TagMappingPage() {
         siteId,
         integrationId,
         mappings: metrics,
+        monitoring,
         alarmRules: alarmRules.map((rule) => ({ ...rule, integrationId })),
       });
       navigate("/equipment/" + equipment.id);
@@ -426,6 +431,15 @@ export default function TagMappingPage() {
                 }}
               />
             )}
+            <MonitoringEditor
+              value={monitoring}
+              onChange={setMonitoring}
+              tags={Array.from(
+                new Map(
+                  [...drafts, ...alarmTags].map((tag) => [tag.nodeId, tag]),
+                ).values(),
+              )}
+            />
             <AlarmRulesEditor
               rules={alarmRules}
               onChange={(rules) => {

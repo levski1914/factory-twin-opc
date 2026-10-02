@@ -48,3 +48,8 @@ Up to 64 distinct node IDs across metric and alarm lists are read in one OPC UA 
 The equipment editor now contains Add more PLC tags. Browse PLC tags starts at Objects and lets you open folders/DBs, go back using the path, filter the current folder and add variables. New variables immediately become available for alarm selection and as unchecked metric rows; existing configuration is preserved. Exact NodeIds can also be entered and are read-checked against the selected integration before adding. Save equipment persists the selected metrics and alarm rules. This does not create or alter tags inside the PLC, and one equipment view still uses one PLC integration.
 
 On the Integrations page, choose a saved connection to see Delete integration. Owners, admins and technicians can delete an unused connection after confirmation. The backend checks company ownership and blocks deletion if metric mappings or alarm rules reference it. No equipment or mapping is cascade-deleted. A saved endpoint is read-only to prevent accidental switching to a new connection while adding tags. This update requires no additional database migration beyond the alarm-tags update.
+
+
+### Confirmed alarms and maintenance verification
+
+See [the monitoring demo guide](docs/monitoring-demo.md) for migration steps, per-equipment configuration, the complete demonstration and operational limits. Monitoring is opt-in per asset; in-app notifications and maintenance events persist in PostgreSQL.

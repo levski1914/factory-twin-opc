@@ -10,6 +10,12 @@ import {
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import {
+  useMonitoring,
+  MonitorStatus,
+  MaintenanceTasks,
+  monitorClass,
+} from "../components/Monitoring";
 import { LiveAlarmRules } from "../components/AlarmRules";
 import { EquipmentPreview } from "../components/EquipmentPreview";
 import {
@@ -20,6 +26,7 @@ import {
 } from "../services/api";
 
 export default function ConfiguredEquipmentPage() {
+  const { data: monitoringData, error: monitoringError } = useMonitoring();
   const navigate = useNavigate();
   const { assetId } = useParams();
   const { user } = useAuth();
@@ -98,7 +105,7 @@ export default function ConfiguredEquipmentPage() {
             if (active) timer = setTimeout(() => void poll(), 5000);
           }
         }
-        void poll();
+        if (!found.monitoring?.enabled) void poll();
       })
       .catch((reason) => {
         if (active) setError(reason.message);
@@ -111,6 +118,37 @@ export default function ConfiguredEquipmentPage() {
       clearTimeout(timer);
     };
   }, [assetId]);
+  const snapshot = monitoringData?.snapshots.find(
+    (item) => item.assetId === assetId,
+  );
+  useEffect(() => {
+    if (!asset?.monitoring?.enabled) return;
+    if (!snapshot || snapshot.stale || snapshot.error) {
+      setReadings([]);
+      setError(
+        monitoringError ||
+          snapshot?.error ||
+          "Waiting for fresh backend measurements",
+      );
+      return;
+    }
+    setReadings(snapshot.readings);
+    setError("");
+    setReadAt(new Date(snapshot.sampleAt).toLocaleTimeString());
+    const point: Record<string, number | string | null> = {
+      time: new Date(snapshot.sampleAt).toLocaleTimeString(),
+      sampleAt: snapshot.sampleAt,
+    };
+    snapshot.readings.forEach((item) => {
+      point[item.nodeId] =
+        item.good && typeof item.value === "number" ? item.value : null;
+    });
+    setHistory((previous) =>
+      previous[previous.length - 1]?.sampleAt === snapshot.sampleAt
+        ? previous
+        : [...previous, point].slice(-120),
+    );
+  }, [asset?.monitoring?.enabled, snapshot, monitoringError]);
   const trendMetrics = (asset?.tagMappings ?? []).filter(
     (metric) =>
       metric.showAsMetric !== false &&
@@ -128,7 +166,12 @@ export default function ConfiguredEquipmentPage() {
   ];
   const canEdit = ["OWNER", "ADMIN", "TECHNICIAN"].includes(user?.role ?? "");
   return (
-    <main className="main min-h-screen equipment-detail">
+    <main
+      className={
+        "main min-h-screen equipment-detail " +
+        (asset?.monitoring?.enabled ? monitorClass(snapshot) : "")
+      }
+    >
       <div className="mx-auto max-w-screen-2xl">
         <header className="mb-8 flex items-center justify-between gap-4">
           <Link to="/dashboard" className="text-cyan-300">
@@ -181,7 +224,9 @@ export default function ConfiguredEquipmentPage() {
                 : readAt
                   ? "PLC values · last read " +
                     readAt +
-                    " · refresh every 5 seconds"
+                    (asset.monitoring?.enabled
+                      ? " · backend monitoring"
+                      : " · refresh every 5 seconds")
                   : "Waiting for PLC values"
             }
           />
@@ -265,15 +310,22 @@ export default function ConfiguredEquipmentPage() {
                 <h2>Live Alarms</h2>
               </div>
               <p className="empty-text mb-3">
-                Current PLC states · refresh every 5 seconds
+                {asset.monitoring?.enabled
+                  ? "Confirmed backend states"
+                  : "Current PLC states · refresh every 5 seconds"}
               </p>
-              <LiveAlarmRules
-                rules={asset.alarmRules ?? []}
-                readings={readings}
-              />
+              {asset.monitoring?.enabled ? (
+                <MonitorStatus snapshot={snapshot} />
+              ) : (
+                <LiveAlarmRules
+                  rules={asset.alarmRules ?? []}
+                  readings={readings}
+                />
+              )}
               <p className="empty-text mt-4 text-xs">
-                Session monitoring only. Alarm history and acknowledgement are
-                not connected yet.
+                {asset.monitoring?.enabled
+                  ? "Confirmed alarms create maintenance tasks. Measurements continue while the backend runs."
+                  : "Enable backend monitoring in Edit equipment to record confirmed alarms and verify repairs."}
               </p>
             </section>
             <section className="panel">
@@ -286,6 +338,9 @@ export default function ConfiguredEquipmentPage() {
               </p>
             </section>
           </div>
+        )}
+        {asset?.monitoring?.enabled && (
+          <MaintenanceTasks data={monitoringData} assetId={asset.id} />
         )}
       </div>
     </main>

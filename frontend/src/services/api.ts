@@ -133,6 +133,9 @@ export type Metric = {
   showAsMetric?: boolean;
 };
 export type AlarmRule = {
+  delaySeconds?: number;
+  clearSeconds?: number;
+  resetThreshold?: number;
   name: string;
   nodeId: string;
   tagName: string;
@@ -142,6 +145,7 @@ export type AlarmRule = {
   severity: "WARNING" | "CRITICAL";
 };
 export type Equipment = {
+  monitoring?: MonitoringConfig;
   alarmRules?: AlarmRule[];
   id: string;
   name: string;
@@ -176,6 +180,7 @@ export const saveEquipment = (data: {
   siteId: string;
   integrationId: string;
   mappings: Metric[];
+  monitoring?: MonitoringConfig;
   alarmRules?: AlarmRule[];
 }) =>
   request<Equipment>("/tag-mapping/equipment", {
@@ -194,4 +199,83 @@ export const readEquipmentPreview = (
 export const deleteIntegration = (id: string) =>
   request<{ ok: boolean }>("/integrations/" + encodeURIComponent(id), {
     method: "DELETE",
+  });
+
+export type MonitoringConfig = {
+  enabled: boolean;
+  runNodeId: string;
+  runCondition: "TRUE" | "GT";
+  runThreshold: number;
+  loadNodeId: string;
+  minimumLoad: number;
+  verificationSeconds: number;
+};
+export type MonitorRuleState = {
+  key: string;
+  name: string;
+  severity: string;
+  state: string;
+  latched: boolean;
+  progressSeconds: number;
+  delaySeconds: number;
+};
+export type MonitorSnapshot = {
+  assetId: string;
+  sampleAt: number;
+  stale: boolean;
+  readings: PlcReading[];
+  rules: MonitorRuleState[];
+  operating: boolean | null;
+  verification: string;
+  error: string | null;
+};
+export type MaintenanceCase = {
+  id: string;
+  assetId: string;
+  assetName: string;
+  status: string;
+  severity: string;
+  assigneeId: string | null;
+  assigneeName: string | null;
+  reportedName: string | null;
+  reportNote: string | null;
+  createdAt: string;
+  reportedAt: string | null;
+  verificationSince: string | null;
+};
+export type MonitorOverview = {
+  serverTime: number;
+  snapshots: MonitorSnapshot[];
+  cases: MaintenanceCase[];
+  notifications: Array<{
+    id: string;
+    caseId: string;
+    message: string;
+    readAt: string | null;
+    createdAt: string;
+  }>;
+};
+export type MaintenanceEvent = {
+  id: string;
+  kind: string;
+  message: string;
+  createdAt: string;
+  evidence: unknown;
+};
+export const getMonitoring = () => request<MonitorOverview>("/monitoring");
+export const getMaintenanceCase = (id: string) =>
+  request<{ task: MaintenanceCase; events: MaintenanceEvent[] }>(
+    "/monitoring/cases/" + encodeURIComponent(id),
+  );
+export const updateMaintenanceCase = (
+  id: string,
+  data: { action: "CLAIM" | "REPORT"; note?: string; repairAction?: string },
+) =>
+  request<MaintenanceCase>("/monitoring/cases/" + encodeURIComponent(id), {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+export const readMonitorNotification = (id: string) =>
+  request("/monitoring/notifications/" + encodeURIComponent(id) + "/read", {
+    method: "PATCH",
   });

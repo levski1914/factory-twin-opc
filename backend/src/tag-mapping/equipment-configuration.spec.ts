@@ -24,6 +24,8 @@ describe('Equipment ownership and configuration', () => {
   };
   function setup() {
     const tx = {
+      $queryRaw: jest.fn(),
+      maintenanceCase: {count: jest.fn().mockResolvedValue(0)},
       site: { findFirst: jest.fn().mockResolvedValue({ id: 'site-a' }) },
       integration: {
         findFirst: jest

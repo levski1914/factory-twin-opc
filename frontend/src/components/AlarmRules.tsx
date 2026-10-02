@@ -193,6 +193,7 @@ export function AlarmRulesEditor({
                   update(index, {
                     condition: e.target.value as AlarmRule["condition"],
                     threshold: 0,
+                    resetThreshold: undefined,
                   })
                 }
               >
@@ -237,6 +238,52 @@ export function AlarmRulesEditor({
                 value={Number.isNaN(rule.threshold) ? "" : rule.threshold}
                 onChange={(e) =>
                   update(index, { threshold: e.target.valueAsNumber })
+                }
+              />
+            </label>
+          )}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="grid gap-2 text-sm">
+              Confirm after (seconds)
+              <input
+                className={input}
+                type="number"
+                min={0}
+                max={3600}
+                value={rule.delaySeconds ?? 10}
+                onChange={(e) =>
+                  update(index, { delaySeconds: e.target.valueAsNumber })
+                }
+              />
+            </label>
+            <label className="grid gap-2 text-sm">
+              Recovery stable for (seconds)
+              <input
+                className={input}
+                type="number"
+                min={0}
+                max={3600}
+                value={rule.clearSeconds ?? 5}
+                onChange={(e) =>
+                  update(index, { clearSeconds: e.target.valueAsNumber })
+                }
+              />
+            </label>
+          </div>
+          {["GT", "LT"].includes(rule.condition) && (
+            <label className="grid gap-2 text-sm">
+              Recovery threshold (optional hysteresis)
+              <input
+                className={input}
+                type="number"
+                value={rule.resetThreshold ?? ""}
+                onChange={(e) =>
+                  update(index, {
+                    resetThreshold:
+                      e.target.value === ""
+                        ? undefined
+                        : e.target.valueAsNumber,
+                  })
                 }
               />
             </label>

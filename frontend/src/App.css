@@ -660,3 +660,7 @@ body {
   .equipment-metric-grid { grid-template-columns: 1fr; }
   .equipment-detail .panel { min-width: 0; }
 }
+
+.monitor-warning { border: 2px solid #fb923c !important; box-shadow: inset 0 0 18px #fb923c18; }
+.monitor-critical { border: 2px solid #f87171 !important; box-shadow: inset 0 0 18px #f8717120; }
+.monitor-unknown { border: 2px dashed #94a3b8 !important; }

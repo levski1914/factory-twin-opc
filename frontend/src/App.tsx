@@ -6,6 +6,7 @@ import {
   Outlet,
 } from "react-router-dom";
 
+import MaintenancePage from "./components/Monitoring";
 import Dashboard from "./pages/Dashboard";
 import AssetDetail from "./pages/AssetDetail";
 import "./App.css";
@@ -45,6 +46,7 @@ function App() {
           <Route path="/login" element={<AuthPage mode="login" />} />
           <Route path="/register" element={<AuthPage mode="register" />} />
           <Route element={<Protected />}>
+            <Route path="/maintenance" element={<MaintenancePage />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/setup" element={<SetupPage />} />
             <Route path="/alarms" element={<AlarmsPage />} />

@@ -1,3 +1,4 @@
+import { MonitoringModule } from './monitoring/monitoring.module';
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -15,6 +16,7 @@ import { PlatformAdminModule } from './platform-admin/platform-admin.module';
 
 @Module({
   imports: [
+    MonitoringModule,
     SimulatorModule,
     GatewayModule,
     PrismaModule,
