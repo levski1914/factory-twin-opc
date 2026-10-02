@@ -1,0 +1,596 @@
+From 6bf2703210fbac0cd64a4015586ce67b126e5fd1 Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Thu, 1 Oct 2026 19:09:44 +0300
+Subject: [PATCH] Browse more PLC tags inside equipment editor and delete
+ unused integrations
+
+---
+ README.md                                     |   7 +
+ .../integrations/integration-delete.spec.ts   |  65 ++++++
+ .../integrations/integrations.controller.ts   |  58 +++++
+ frontend/src/components/PlcTagPicker.tsx      | 214 ++++++++++++++++++
+ frontend/src/pages/IntegrationsPage.tsx       |  58 +++++
+ frontend/src/pages/TagMappingPage.tsx         |  64 +++---
+ frontend/src/services/api.ts                  |   5 +
+ 7 files changed, 441 insertions(+), 30 deletions(-)
+ create mode 100644 backend/src/integrations/integration-delete.spec.ts
+ create mode 100644 frontend/src/components/PlcTagPicker.tsx
+
+diff --git a/README.md b/README.md
+index c5e8780..c799b5c 100644
+--- a/README.md
++++ b/README.md
+@@ -41,3 +41,10 @@ Rules support BOOL/0/1 states, numeric greater-than/less-than/equality, and bit
+ Copy alarm template lists other equipment of the same type in your company. It appends names, conditions and severity to the current draft, clearing source tag addresses. Bind each rule to the target machine's actual tag, then save. Existing equipment is never changed in bulk. A shared summary BOOL cannot identify which individual machine failed. Distinct instance members, array elements, bit positions or equipment-identifying codes require explicit mapping.
+ 
+ Up to 64 distinct node IDs across metric and alarm lists are read in one OPC UA batch. At least one metric remains required by the current equipment editor. Templates come from saved equipment; there is no separate template catalogue yet.
++
++
++### Add more tags and remove unused connections
++
++The equipment editor now contains Add more PLC tags. Browse PLC tags starts at Objects and lets you open folders/DBs, go back using the path, filter the current folder and add variables. New variables immediately become available for alarm selection and as unchecked metric rows; existing configuration is preserved. Exact NodeIds can also be entered and are read-checked against the selected integration before adding. Save equipment persists the selected metrics and alarm rules. This does not create or alter tags inside the PLC, and one equipment view still uses one PLC integration.
++
++On the Integrations page, choose a saved connection to see Delete integration. Owners, admins and technicians can delete an unused connection after confirmation. The backend checks company ownership and blocks deletion if metric mappings or alarm rules reference it. No equipment or mapping is cascade-deleted. A saved endpoint is read-only to prevent accidental switching to a new connection while adding tags. This update requires no additional database migration beyond the alarm-tags update.
+diff --git a/backend/src/integrations/integration-delete.spec.ts b/backend/src/integrations/integration-delete.spec.ts
+new file mode 100644
+index 0000000..49077fe
+--- /dev/null
++++ b/backend/src/integrations/integration-delete.spec.ts
+@@ -0,0 +1,65 @@
++jest.mock('../prisma/prisma.service', () => ({ PrismaService: class {} }));
++jest.mock('./opcua/opcua.service', () => ({ OpcuaService: class {} }));
++import { IntegrationsController } from './integrations.controller';
++describe('Integration deletion', () => {
++  function setup() {
++    const tx = {
++      integration: {
++        findFirst: jest.fn().mockResolvedValue({ id: 'plc-a' }),
++        delete: jest.fn(),
++      },
++      tagMapping: { count: jest.fn().mockResolvedValue(0) },
++      asset: { findMany: jest.fn().mockResolvedValue([]) },
++    };
++    const prisma = {
++      $transaction: jest.fn().mockImplementation((fn) => fn(tx)),
++    };
++    const controller = new IntegrationsController({} as any, prisma as any);
++    return { controller, tx, prisma };
++  }
++  it('deletes unused integrations scoped to the company', async () => {
++    const { controller, tx } = setup();
++    await expect(
++      controller.remove('plc-a', { companyId: 'company-a' }),
++    ).resolves.toEqual({ ok: true });
++    expect(tx.integration.findFirst).toHaveBeenCalledWith({
++      where: { id: 'plc-a', companyId: 'company-a' },
++    });
++    expect(tx.integration.delete).toHaveBeenCalledWith({
++      where: { id: 'plc-a' },
++    });
++  });
++  it('cannot delete another company integration', async () => {
++    const { controller, tx } = setup();
++    tx.integration.findFirst.mockResolvedValue(null);
++    await expect(
++      controller.remove('foreign', { companyId: 'company-a' }),
++    ).rejects.toThrow('Integration not found');
++    expect(tx.integration.delete).not.toHaveBeenCalled();
++  });
++  it('blocks deletion of a PLC with metric mappings', async () => {
++    const { controller, tx } = setup();
++    tx.tagMapping.count.mockResolvedValue(1);
++    await expect(
++      controller.remove('plc-a', { companyId: 'company-a' }),
++    ).rejects.toThrow('used by equipment');
++    expect(tx.integration.delete).not.toHaveBeenCalled();
++  });
++  it('blocks deletion of a PLC referenced only by an alarm', async () => {
++    const { controller, tx } = setup();
++    tx.asset.findMany.mockResolvedValue([
++      { alarmRules: [{ integrationId: 'plc-a' }] },
++    ]);
++    await expect(
++      controller.remove('plc-a', { companyId: 'company-a' }),
++    ).rejects.toThrow('used by equipment');
++    expect(tx.integration.delete).not.toHaveBeenCalled();
++  });
++  it('reports a concurrent binding as a conflict', async () => {
++    const { controller, prisma } = setup();
++    prisma.$transaction.mockRejectedValue({ code: 'P2003' });
++    await expect(
++      controller.remove('plc-a', { companyId: 'company-a' }),
++    ).rejects.toThrow('in use');
++  });
++});
+diff --git a/backend/src/integrations/integrations.controller.ts b/backend/src/integrations/integrations.controller.ts
+index d9d9195..74cb63f 100644
+--- a/backend/src/integrations/integrations.controller.ts
++++ b/backend/src/integrations/integrations.controller.ts
+@@ -2,6 +2,10 @@ import {
+   BadRequestException,
+   Body,
+   Controller,
++  Delete,
++  Param,
++  NotFoundException,
++  ConflictException,
+   Get,
+   Post,
+   Query,
+@@ -67,6 +71,60 @@ export class IntegrationsController {
+     });
+   }
+ 
++  @Delete(':id')
++  @Roles('OWNER', 'ADMIN', 'TECHNICIAN')
++  async remove(@Param('id') id: string, @CurrentUser() user: any) {
++    if (!user.companyId)
++      throw new BadRequestException('A company account is required');
++    try {
++      return await this.prisma.$transaction(
++        async (tx) => {
++          const integration = await tx.integration.findFirst({
++            where: { id, companyId: user.companyId },
++          });
++          if (!integration)
++            throw new NotFoundException('Integration not found');
++          const mappings = await tx.tagMapping.count({
++            where: { integrationId: id },
++          });
++          const assets = await tx.asset.findMany({
++            where: { companyId: user.companyId },
++            select: { alarmRules: true },
++          });
++          const alarmUse = assets.some(
++            (asset) =>
++              Array.isArray(asset.alarmRules) &&
++              asset.alarmRules.some(
++                (rule) =>
++                  rule &&
++                  typeof rule === 'object' &&
++                  !Array.isArray(rule) &&
++                  rule.integrationId === id,
++              ),
++          );
++          if (mappings || alarmUse)
++            throw new ConflictException(
++              'This integration is used by equipment or alarm tags. Reassign those tags before deleting it.',
++            );
++          await tx.integration.delete({ where: { id } });
++          return { ok: true };
++        },
++        { isolationLevel: 'Serializable' },
++      );
++    } catch (error) {
++      if (
++        error &&
++        typeof error === 'object' &&
++        'code' in error &&
++        ['P2003', 'P2034'].includes(String(error.code))
++      )
++        throw new ConflictException(
++          'Integration changed or is in use. Refresh and try again.',
++        );
++      throw error;
++    }
++  }
++
+   @Post('opcua/test')
+   @Roles('OWNER', 'ADMIN', 'TECHNICIAN')
+   test(@Body() body: { endpointUrl?: string }) {
+diff --git a/frontend/src/components/PlcTagPicker.tsx b/frontend/src/components/PlcTagPicker.tsx
+new file mode 100644
+index 0000000..339acb3
+--- /dev/null
++++ b/frontend/src/components/PlcTagPicker.tsx
+@@ -0,0 +1,214 @@
++import { useEffect, useRef, useState } from "react";
++import {
++  browseOpc,
++  readEquipmentPreview,
++  type Integration,
++} from "../services/api";
++type Tag = { nodeId: string; tagName: string };
++type Node = { nodeId: string; name: string; nodeClass: string | number };
++export default function PlcTagPicker({
++  integration,
++  onAdd,
++}: {
++  integration: Integration;
++  onAdd: (tag: Tag) => void;
++}) {
++  const active = useRef(true);
++  useEffect(() => {
++    active.current = true;
++    return () => {
++      active.current = false;
++    };
++  }, []);
++  const [nodes, setNodes] = useState<Node[]>([]);
++  const [path, setPath] = useState([{ nodeId: "ns=0;i=85", name: "Objects" }]);
++  const [busy, setBusy] = useState(false);
++  const [error, setError] = useState("");
++  const [notice, setNotice] = useState("");
++  const [query, setQuery] = useState("");
++  const [nodeId, setNodeId] = useState("");
++  const [tagName, setTagName] = useState("");
++  async function browse(next: typeof path) {
++    setBusy(true);
++    setError("");
++    setNotice("");
++    try {
++      const data = await browseOpc(
++        integration.endpointUrl,
++        next[next.length - 1].nodeId,
++      );
++      setNodes(data);
++      setPath(next);
++      setQuery("");
++    } catch (reason) {
++      setError(reason instanceof Error ? reason.message : "Browse failed");
++    } finally {
++      setBusy(false);
++    }
++  }
++  function add(tag: Tag) {
++    if (!active.current) return;
++    onAdd(tag);
++    setNotice(
++      "Added: " +
++        tag.tagName +
++        ". Select it in an alarm or enable its metric card, then Save equipment.",
++    );
++  }
++  async function addManual() {
++    setBusy(true);
++    setError("");
++    setNotice("");
++    try {
++      const [reading] = await readEquipmentPreview(integration.id, [
++        nodeId.trim(),
++      ]);
++      if (!reading?.good)
++        throw new Error(
++          reading?.statusCode || "Tag cannot be read from this PLC",
++        );
++      add({ nodeId: nodeId.trim(), tagName: tagName.trim() || nodeId.trim() });
++      setNodeId("");
++      setTagName("");
++    } catch (reason) {
++      setError(
++        reason instanceof Error ? reason.message : "Tag validation failed",
++      );
++    } finally {
++      setBusy(false);
++    }
++  }
++  return (
++    <section className="panel space-y-4">
++      <div>
++        <h2 className="text-lg font-semibold">Add more PLC tags</h2>
++        <p className="text-sm text-slate-400">
++          {integration.name} · {integration.endpointUrl}
++        </p>
++        <p className="text-sm text-slate-400">
++          Browse any folder or DB exposed by this PLC. Adding tags keeps your
++          current equipment settings.
++        </p>
++      </div>
++      <button
++        type="button"
++        disabled={busy}
++        className="text-cyan-300"
++        onClick={() => void browse([{ nodeId: "ns=0;i=85", name: "Objects" }])}
++      >
++        {busy ? "Reading…" : "Browse PLC tags"}
++      </button>
++      <div className="flex flex-wrap gap-2">
++        {path.map((part, index) => (
++          <button
++            type="button"
++            disabled={busy}
++            className="text-sm text-sky-300"
++            key={index}
++            onClick={() => void browse(path.slice(0, index + 1))}
++          >
++            {index ? " / " : ""}
++            {part.name}
++          </button>
++        ))}
++      </div>
++      <input
++        aria-label="Filter tags in this folder"
++        className="w-full rounded-lg bg-slate-950 p-3"
++        placeholder="Filter this folder…"
++        value={query}
++        onChange={(e) => setQuery(e.target.value)}
++      />
++      <div className="max-h-72 space-y-2 overflow-auto">
++        {nodes
++          .filter((n) =>
++            (n.name + " " + n.nodeId)
++              .toLowerCase()
++              .includes(query.toLowerCase()),
++          )
++          .map((node) => (
++            <div
++              key={node.nodeId}
++              className="flex items-center gap-3 rounded-lg border border-slate-700 p-3"
++            >
++              <div className="min-w-0 flex-1">
++                <strong className="break-all text-sm">{node.name}</strong>
++                <p className="break-all text-xs text-slate-400">
++                  {node.nodeId}
++                </p>
++              </div>
++              <button
++                type="button"
++                disabled={busy}
++                className="text-sm text-sky-300"
++                onClick={() =>
++                  void browse([
++                    ...path,
++                    { nodeId: node.nodeId, name: node.name },
++                  ])
++                }
++              >
++                Open
++              </button>
++              {String(node.nodeClass) === "2" && (
++                <button
++                  type="button"
++                  disabled={busy}
++                  className="text-cyan-300"
++                  onClick={() =>
++                    add({
++                      nodeId: node.nodeId,
++                      tagName: node.name.replace(/^\d+:/, ""),
++                    })
++                  }
++                >
++                  + Add
++                </button>
++              )}
++            </div>
++          ))}
++      </div>
++      <details>
++        <summary className="cursor-pointer text-sm text-cyan-300">
++          Add by exact OPC UA NodeId
++        </summary>
++        <div className="mt-3 grid gap-3">
++          <input
++            aria-label="Tag name"
++            maxLength={256}
++            className="rounded-lg bg-slate-950 p-3"
++            placeholder="Tag name (optional)"
++            value={tagName}
++            onChange={(e) => setTagName(e.target.value)}
++          />
++          <input
++            aria-label="OPC UA NodeId"
++            maxLength={1024}
++            className="rounded-lg bg-slate-950 p-3"
++            placeholder='ns=3;s="DB_Motors"."Motor1"."Fault"'
++            value={nodeId}
++            onChange={(e) => setNodeId(e.target.value)}
++          />
++          <button
++            type="button"
++            disabled={busy || !nodeId.trim()}
++            className="text-left text-cyan-300"
++            onClick={() => void addManual()}
++          >
++            Check and add tag
++          </button>
++        </div>
++      </details>
++      {error && (
++        <p role="alert" className="text-red-300">
++          {error}
++        </p>
++      )}
++      {notice && (
++        <p role="status" className="text-green-300">
++          {notice}
++        </p>
++      )}
++    </section>
++  );
++}
+diff --git a/frontend/src/pages/IntegrationsPage.tsx b/frontend/src/pages/IntegrationsPage.tsx
+index 8c683aa..9458bad 100644
+--- a/frontend/src/pages/IntegrationsPage.tsx
++++ b/frontend/src/pages/IntegrationsPage.tsx
+@@ -15,6 +15,7 @@ import {
+   getSites,
+   getIntegrations,
+   saveIntegration,
++  deleteIntegration,
+   type Site,
+   type Integration,
+ } from "../services/api";
+@@ -31,6 +32,44 @@ export default function IntegrationsPage() {
+   const [connectionName, setConnectionName] = useState("");
+   const [integrationId, setIntegrationId] = useState("");
+   const [saving, setSaving] = useState(false);
++  const [deleting, setDeleting] = useState(false);
++  const canEdit = ["OWNER", "ADMIN", "TECHNICIAN"].includes(user?.role ?? "");
++  async function handleDeleteIntegration() {
++    const selected = integrations.find((item) => item.id === integrationId);
++    if (
++      !selected ||
++      !window.confirm(
++        'Delete integration "' +
++          selected.name +
++          '"? Equipment using it will block deletion.',
++      )
++    )
++      return;
++    setDeleting(true);
++    try {
++      await deleteIntegration(selected.id);
++      setIntegrations((current) =>
++        current.filter((item) => item.id !== selected.id),
++      );
++      setIntegrationId("");
++      setConnectionName("");
++      resetBrowser();
++      try {
++        localStorage.removeItem(
++          "discoveredTags:" + user?.companyId + ":" + selected.id,
++        );
++      } catch {
++        /* Optional local cache. */
++      }
++      setStatusText("Integration deleted");
++    } catch (error) {
++      setStatusText(
++        error instanceof Error ? error.message : "Could not delete integration",
++      );
++    } finally {
++      setDeleting(false);
++    }
++  }
+   useEffect(() => {
+     Promise.all([getSites(), getIntegrations()])
+       .then(([list, saved]) => {
+@@ -323,6 +362,7 @@ export default function IntegrationsPage() {
+             Saved integration
+             <select
+               className="rounded-xl border border-slate-700 bg-slate-950 p-3"
++              disabled={deleting}
+               value={integrationId}
+               onChange={(e) => {
+                 const saved = integrations.find(
+@@ -364,6 +404,7 @@ export default function IntegrationsPage() {
+         </div>
+         <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
+           <input
++            disabled={Boolean(integrationId) || deleting}
+             value={endpointUrl}
+             onChange={(e) => {
+               setEndpointUrl(e.target.value);
+@@ -382,6 +423,23 @@ export default function IntegrationsPage() {
+           </button>
+         </div>
+ 
++        {integrationId && (
++          <div className="mt-4 flex flex-wrap items-center gap-4">
++            <p className="text-sm text-slate-400">
++              Use Browse below to add more tags to this saved PLC connection.
++            </p>
++            {canEdit && (
++              <button
++                type="button"
++                disabled={deleting}
++                onClick={() => void handleDeleteIntegration()}
++                className="rounded-lg border border-red-500/40 px-4 py-2 text-sm text-red-300"
++              >
++                {deleting ? "Deleting…" : "Delete integration"}
++              </button>
++            )}
++          </div>
++        )}
+         {!integrationId && (
+           <div className="mt-4 flex flex-wrap gap-3">
+             <input
+diff --git a/frontend/src/pages/TagMappingPage.tsx b/frontend/src/pages/TagMappingPage.tsx
+index bccc1da..e705fd7 100644
+--- a/frontend/src/pages/TagMappingPage.tsx
++++ b/frontend/src/pages/TagMappingPage.tsx
+@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
+ import { ArrowDown, ArrowUp, Save, RefreshCw } from "lucide-react";
+ import { useAuth } from "../auth/AuthContext";
+ import { AlarmRulesEditor, LiveAlarmRules } from "../components/AlarmRules";
++import PlcTagPicker from "../components/PlcTagPicker";
+ import { EquipmentPreview } from "../components/EquipmentPreview";
+ import {
+   getAssets,
+@@ -391,37 +392,40 @@ export default function TagMappingPage() {
+                 </label>
+               </div>
+             </section>
+-            <section className="panel space-y-3">
+-              <a
+-                className="block text-cyan-300"
+-                target="_blank"
+-                rel="noopener noreferrer"
+-                href={
+-                  "/integrations?integrationId=" +
+-                  encodeURIComponent(integrationId) +
+-                  (equipmentId
+-                    ? "&assetId=" + encodeURIComponent(equipmentId)
+-                    : "")
++            {integrations.find((item) => item.id === integrationId) && (
++              <PlcTagPicker
++                key={integrationId}
++                integration={
++                  integrations.find((item) => item.id === integrationId)!
+                 }
+-              >
+-                Browse tags from selected PLC ↗
+-              </a>
+-              <p className="text-sm text-slate-400">
+-                Opens a separate tab to preserve your edits. Select and send
+-                tags there, then return here and import them.
+-              </p>
+-              <button
+-                type="button"
+-                className="text-cyan-300"
+-                onClick={() => setAlarmTags(loadDiscovered(integrationId))}
+-              >
+-                Import selected tags for alarms
+-              </button>
+-              <p className="text-xs text-slate-400">
+-                {alarmTags.length} tags available for alarm binding. PLC name is
+-                only needed when creating a new connection.
+-              </p>
+-            </section>
++                onAdd={(tag) => {
++                  setAlarmTags((current) =>
++                    current.some((item) => item.nodeId === tag.nodeId)
++                      ? current
++                      : [...current, tag],
++                  );
++                  setDrafts((current) =>
++                    current.some((item) => item.nodeId === tag.nodeId)
++                      ? current
++                      : [...current, { ...suggest(tag), enabled: false }],
++                  );
++                  const stored = loadDiscovered(integrationId);
++                  if (!stored.some((item) => item.nodeId === tag.nodeId)) {
++                    try {
++                      localStorage.setItem(
++                        "discoveredTags:" +
++                          user?.companyId +
++                          ":" +
++                          integrationId,
++                        JSON.stringify([...stored, tag]),
++                      );
++                    } catch {
++                      /* Tag is still available in this editor. */
++                    }
++                  }
++                }}
++              />
++            )}
+             <AlarmRulesEditor
+               rules={alarmRules}
+               onChange={(rules) => {
+diff --git a/frontend/src/services/api.ts b/frontend/src/services/api.ts
+index a1ac7a8..8434e28 100644
+--- a/frontend/src/services/api.ts
++++ b/frontend/src/services/api.ts
+@@ -190,3 +190,8 @@ export const readEquipmentPreview = (
+     method: "POST",
+     body: JSON.stringify({ integrationId, nodeIds }),
+   });
++
++export const deleteIntegration = (id: string) =>
++  request<{ ok: boolean }>("/integrations/" + encodeURIComponent(id), {
++    method: "DELETE",
++  });
+-- 
+2.51.1
+

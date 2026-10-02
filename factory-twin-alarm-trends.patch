@@ -1,0 +1,182 @@
+From 498af5e7559a581b7bddb47c0b5dba43f312cb6c Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Thu, 1 Oct 2026 19:35:13 +0300
+Subject: [PATCH] Clarify inactive alarm states and show all live trend metrics
+
+---
+ frontend/src/components/AlarmRules.tsx        | 30 ++++++---
+ .../src/pages/ConfiguredEquipmentPage.tsx     | 63 ++++++++++++++-----
+ 2 files changed, 71 insertions(+), 22 deletions(-)
+
+diff --git a/frontend/src/components/AlarmRules.tsx b/frontend/src/components/AlarmRules.tsx
+index b8b3446..37a078b 100644
+--- a/frontend/src/components/AlarmRules.tsx
++++ b/frontend/src/components/AlarmRules.tsx
+@@ -39,25 +39,41 @@ export function LiveAlarmRules({
+     <div className="space-y-3">
+       {!rules.length && <p className="empty-text">No alarm tags configured.</p>}
+       {rules.map((rule, index) => {
+-        const state = alarmState(
+-          rule,
+-          readings.find((r) => r.nodeId === rule.nodeId),
+-        );
++        const reading = readings.find((r) => r.nodeId === rule.nodeId);
++        const state = alarmState(rule, reading);
+         return (
+           <div key={index} className="rounded-xl border border-slate-700 p-3">
+             <strong>{rule.name}</strong>
+             <p
+               className={
+                 state === "ACTIVE"
+-                  ? "text-red-300"
++                  ? rule.severity === "CRITICAL"
++                    ? "text-red-300"
++                    : "text-amber-300"
+                   : state === "NORMAL"
+                     ? "text-green-300"
+                     : "text-amber-300"
+               }
+             >
+-              {state} · {rule.severity}
++              {state === "ACTIVE"
++                ? `Active · ${rule.severity}`
++                : state === "NORMAL"
++                  ? "Inactive"
++                  : "Unknown · check PLC data"}
+             </p>
+-            <small className="text-slate-400">{rule.tagName}</small>
++            <small className="block break-all text-slate-400">
++              {rule.tagName}
++            </small>
++            <small className="block text-slate-400">
++              PLC value:{" "}
++              {reading?.good && reading.value != null
++                ? String(reading.value)
++                : "Unavailable"}{" "}
++              · Active when: {rule.condition}
++              {!["TRUE", "FALSE"].includes(rule.condition)
++                ? ` ${rule.threshold}`
++                : ""}
++            </small>
+           </div>
+         );
+       })}
+diff --git a/frontend/src/pages/ConfiguredEquipmentPage.tsx b/frontend/src/pages/ConfiguredEquipmentPage.tsx
+index f446637..cfb5d51 100644
+--- a/frontend/src/pages/ConfiguredEquipmentPage.tsx
++++ b/frontend/src/pages/ConfiguredEquipmentPage.tsx
+@@ -4,6 +4,7 @@ import {
+   XAxis,
+   YAxis,
+   Tooltip,
++  Legend,
+   ResponsiveContainer,
+ } from "recharts";
+ import { useEffect, useState } from "react";
+@@ -57,7 +58,7 @@ export default function ConfiguredEquipmentPage() {
+           setError("No metrics configured");
+           return;
+         }
+-        setSelectedMetric(mappings[0].nodeId);
++        setSelectedMetric("");
+         async function poll() {
+           try {
+             const data = await readEquipmentPreview(mappings[0].integrationId, [
+@@ -110,6 +111,21 @@ export default function ConfiguredEquipmentPage() {
+       clearTimeout(timer);
+     };
+   }, [assetId]);
++  const trendMetrics = (asset?.tagMappings ?? []).filter(
++    (metric) =>
++      metric.showAsMetric !== false &&
++      (!selectedMetric || metric.nodeId === selectedMetric),
++  );
++  const trendColors = [
++    "#38bdf8",
++    "#fb923c",
++    "#4ade80",
++    "#c084fc",
++    "#facc15",
++    "#f472b6",
++    "#2dd4bf",
++    "#f87171",
++  ];
+   const canEdit = ["OWNER", "ADMIN", "TECHNICIAN"].includes(user?.role ?? "");
+   return (
+     <main className="main min-h-screen equipment-detail">
+@@ -184,6 +200,7 @@ export default function ConfiguredEquipmentPage() {
+                   value={selectedMetric}
+                   onChange={(event) => setSelectedMetric(event.target.value)}
+                 >
++                  <option value="">All metrics</option>
+                   {asset.tagMappings
+                     .filter((m) => m.showAsMetric !== false)
+                     .map((m) => (
+@@ -194,8 +211,10 @@ export default function ConfiguredEquipmentPage() {
+                     ))}
+                 </select>
+               </label>
+-              {history.some(
+-                (point) => typeof point[selectedMetric] === "number",
++              {history.some((point) =>
++                trendMetrics.some(
++                  (metric) => typeof point[metric.nodeId] === "number",
++                ),
+               ) ? (
+                 <ResponsiveContainer width="100%" height={240}>
+                   <LineChart data={history}>
+@@ -207,18 +226,25 @@ export default function ConfiguredEquipmentPage() {
+                         borderColor: "#1f354d",
+                       }}
+                     />
+-                    <Line
+-                      dataKey={(point) => point[selectedMetric]}
+-                      name={
+-                        asset.tagMappings.find(
+-                          (m) => m.nodeId === selectedMetric,
+-                        )?.label || selectedMetric
+-                      }
+-                      stroke="#38bdf8"
+-                      dot={false}
+-                      isAnimationActive={false}
+-                      connectNulls={false}
+-                    />
++                    <Legend />
++                    {trendMetrics.map((metric, index) => (
++                      <Line
++                        key={metric.nodeId}
++                        dataKey={(point) => point[metric.nodeId]}
++                        name={
++                          (metric.label || metric.tagName) +
++                          (metric.unit ? ` (${metric.unit})` : "")
++                        }
++                        stroke={trendColors[index % trendColors.length]}
++                        strokeDasharray={
++                          index >= trendColors.length ? "5 3" : undefined
++                        }
++                        strokeWidth={2}
++                        dot={history.length === 1}
++                        isAnimationActive={false}
++                        connectNulls={false}
++                      />
++                    ))}
+                   </LineChart>
+                 </ResponsiveContainer>
+               ) : (
+@@ -226,6 +252,13 @@ export default function ConfiguredEquipmentPage() {
+                   Waiting for numeric PLC readings for this metric.
+                 </p>
+               )}
++              {!selectedMetric && (
++                <p className="mt-3 text-xs text-slate-400">
++                  All numeric metrics share one raw-value scale. Units are shown
++                  in the legend and tooltip. Select one metric for a closer
++                  view.
++                </p>
++              )}
+             </section>
+             <section className="panel">
+               <div className="panel-header">
+-- 
+2.51.1
+
