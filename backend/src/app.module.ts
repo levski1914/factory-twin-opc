@@ -1,3 +1,4 @@
+import { TeamModule } from './team/team.module';
 import { MonitoringModule } from './monitoring/monitoring.module';
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
@@ -16,6 +17,7 @@ import { PlatformAdminModule } from './platform-admin/platform-admin.module';
 
 @Module({
   imports: [
+    TeamModule,
     MonitoringModule,
     SimulatorModule,
     GatewayModule,

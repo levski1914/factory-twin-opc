@@ -70,6 +70,11 @@ export default function Dashboard() {
           <NavLink to="/setup">
             <Settings size={18} /> Workspace
           </NavLink>
+          {["OWNER", "ADMIN"].includes(user?.role ?? "") && (
+            <Link to="/team" className="nav-item">
+              <Settings size={18} /> Team
+            </Link>
+          )}
           <p className="empty-text workspace-email">{user?.email}</p>
           <button
             onClick={() => void signOut().then(() => location.assign("/"))}

@@ -1,3 +1,4 @@
+import TeamPage from "./pages/TeamPage";
 import {
   BrowserRouter,
   Routes,
@@ -46,6 +47,7 @@ function App() {
           <Route path="/login" element={<AuthPage mode="login" />} />
           <Route path="/register" element={<AuthPage mode="register" />} />
           <Route element={<Protected />}>
+            <Route path="/team" element={<TeamPage />} />
             <Route path="/maintenance" element={<MaintenancePage />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/setup" element={<SetupPage />} />

@@ -290,3 +290,19 @@ export const readMonitorNotification = (id: string) =>
   request("/monitoring/notifications/" + encodeURIComponent(id) + "/read", {
     method: "PATCH",
   });
+
+export type TeamMember = {
+  id: string;
+  name: string | null;
+  email: string;
+  role: string;
+  createdAt: string;
+};
+export const getTeam = () => request<TeamMember[]>("/team");
+export const createTeamMember = (data: {
+  name: string;
+  email: string;
+  password: string;
+  role: string;
+}) =>
+  request<TeamMember>("/team", { method: "POST", body: JSON.stringify(data) });
