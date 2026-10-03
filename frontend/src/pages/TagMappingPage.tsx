@@ -1,3 +1,4 @@
+import { monitoringSetupErrors } from "../utils/monitoringSetup";
 import {
   PassportEditor,
   PassportSummary,
@@ -226,6 +227,7 @@ export default function TagMappingPage() {
     .map((item, index) => ({ ...item, displaySlot: index + 1 }));
   async function readPreview() {
     setReading(true);
+    setReadAt("");
     setError("");
     setReadings([]);
     try {
@@ -245,7 +247,12 @@ export default function TagMappingPage() {
       setReading(false);
     }
   }
+  const setupErrors = monitoringSetupErrors(monitoring, readings);
   async function save() {
+    if (setupErrors.length) {
+      setError(setupErrors.join(" "));
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -294,6 +301,7 @@ export default function TagMappingPage() {
           <button
             onClick={save}
             disabled={
+              setupErrors.length > 0 ||
               step !== 3 ||
               !canEdit ||
               busy ||
@@ -634,12 +642,21 @@ export default function TagMappingPage() {
                 </ul>
               </section>
               <PassportSummary value={passport} />
+              {setupErrors.length > 0 && (
+                <p role="alert" className="text-amber-300">
+                  Before saving: {setupErrors.join(" ")}
+                </p>
+              )}
               <MonitoringEditor
                 value={monitoring}
                 onChange={setMonitoring}
+                readings={readings}
+                readAt={readAt}
+                onRead={() => void readPreview()}
+                reading={reading}
                 tags={Array.from(
                   new Map(
-                    [...drafts, ...alarmTags].map((tag) => [tag.nodeId, tag]),
+                    [...alarmTags, ...drafts].map((tag) => [tag.nodeId, tag]),
                   ).values(),
                 )}
               />
@@ -651,7 +668,7 @@ export default function TagMappingPage() {
                 }}
                 tags={Array.from(
                   new Map(
-                    [...drafts, ...alarmTags].map((tag) => [tag.nodeId, tag]),
+                    [...alarmTags, ...drafts].map((tag) => [tag.nodeId, tag]),
                   ).values(),
                 )}
                 equipment={assets}

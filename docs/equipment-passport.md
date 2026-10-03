@@ -12,3 +12,9 @@ Passport ratings are reference data only: they do not enable monitoring, create 
 The equipment detail page shows the stored passport. Existing edit-card links open step 2. This update does not provide automatic manufacturer lookup, document upload, AI diagnosis, or PLC writes.
 
 Validation: frontend and backend builds; passport validation and transactional save/preserve tests; existing alarm, monitoring and integration tests. Database migration and real PLC/UI acceptance still require the deployment environment.
+
+## Assisted repair-check setup
+
+The monitoring editor offers explicit suggestions from metric meanings (unique running/speed and load/current mappings). Suggestions are not PLC type detection and are applied only when the user clicks Use suggested signals. Existing thresholds are preserved and shown with selected display units for review. All tags remain available for unusual equipment.
+
+Check selected signals with PLC uses the editor's manual preview read. Sampled incompatible values (such as 80 in ON/OFF mode or true for numeric load) block saving in this editor and display corrective text. Zero speed/load is a valid reading and does not block configuration. Missing/bad readings remain unverified; offline setup is allowed. Numeric 0/1 remains accepted for boolean feedback, matching the backend engine. This is sample validation, not proof of the full PLC datatype or operating range. Server monitoring still reports incompatible readings as unknown.
