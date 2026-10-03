@@ -1,3 +1,12 @@
+export type EquipmentPassport = {
+  manufacturer?: string;
+  model?: string;
+  serialNumber?: string;
+  reference?: string;
+  ratedPowerKw?: number;
+  ratedCurrentA?: number;
+  maxTemperatureC?: number;
+};
 const API_URL = "http://localhost:3000";
 
 export type AuthUser = {
@@ -146,6 +155,7 @@ export type AlarmRule = {
 };
 export type Equipment = {
   monitoring?: MonitoringConfig;
+  passport?: EquipmentPassport;
   alarmRules?: AlarmRule[];
   id: string;
   name: string;
@@ -181,6 +191,7 @@ export const saveEquipment = (data: {
   integrationId: string;
   mappings: Metric[];
   monitoring?: MonitoringConfig;
+  passport?: EquipmentPassport;
   alarmRules?: AlarmRule[];
 }) =>
   request<Equipment>("/tag-mapping/equipment", {

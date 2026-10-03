@@ -57,6 +57,7 @@ model Integration {
 }
 
 model Asset {
+  passport Json @default("{}")
   monitoring Json @default("{}")
   alarmRules Json @default("[]")
   id        String   @id @default(cuid())

@@ -1,3 +1,4 @@
+import { PassportSummary } from "../components/EquipmentPassport";
 import {
   LineChart,
   Line,
@@ -339,6 +340,7 @@ export default function ConfiguredEquipmentPage() {
             </section>
           </div>
         )}
+        {asset && <PassportSummary value={asset.passport} />}
         {asset?.monitoring?.enabled && (
           <MaintenanceTasks data={monitoringData} assetId={asset.id} />
         )}

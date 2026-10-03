@@ -1,0 +1,1 @@
+ALTER TABLE "Asset" ADD COLUMN "passport" JSONB NOT NULL DEFAULT '{}';

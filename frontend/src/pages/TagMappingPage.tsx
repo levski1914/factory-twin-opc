@@ -1,3 +1,7 @@
+import {
+  PassportEditor,
+  PassportSummary,
+} from "../components/EquipmentPassport";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowDown, ArrowUp, Save, RefreshCw } from "lucide-react";
@@ -12,6 +16,7 @@ import {
   getSites,
   readEquipmentPreview,
   saveEquipment,
+  type EquipmentPassport,
   type AlarmRule,
   type Equipment,
   type Integration,
@@ -66,6 +71,8 @@ export default function TagMappingPage() {
   const { user } = useAuth();
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const [step, setStep] = useState(params.get("metricId") ? 2 : 1);
+  const [passport, setPassport] = useState<EquipmentPassport>({});
   const [equipmentId, setEquipmentId] = useState<string>();
   const [assets, setAssets] = useState<Equipment[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
@@ -110,6 +117,7 @@ export default function TagMappingPage() {
                 params.get("integrationId")),
           ) ?? connections[0];
         if (asset) {
+          setPassport(asset.passport ?? {});
           setMonitoring({ ...defaultMonitoring, ...asset.monitoring });
           setAlarmRules(asset.alarmRules ?? []);
           setEquipmentId(asset.id);
@@ -224,7 +232,8 @@ export default function TagMappingPage() {
       setReadings(
         await readEquipmentPreview(integrationId, [
           ...new Set([
-            ...metrics.map((item) => item.nodeId),
+            ...drafts.map((item) => item.nodeId),
+            ...[monitoring.runNodeId, monitoring.loadNodeId].filter(Boolean),
             ...alarmRules.map((rule) => rule.nodeId).filter(Boolean),
           ]),
         ]),
@@ -249,6 +258,7 @@ export default function TagMappingPage() {
         integrationId,
         mappings: metrics,
         monitoring,
+        passport,
         alarmRules: alarmRules.map((rule) => ({ ...rule, integrationId })),
       });
       navigate("/equipment/" + equipment.id);
@@ -284,6 +294,7 @@ export default function TagMappingPage() {
           <button
             onClick={save}
             disabled={
+              step !== 3 ||
               !canEdit ||
               busy ||
               reading ||
@@ -301,7 +312,11 @@ export default function TagMappingPage() {
             className="flex items-center gap-2 rounded-xl bg-cyan-400 px-5 py-3 font-semibold text-slate-950 disabled:opacity-40"
           >
             <Save size={18} />
-            {busy ? "Saving..." : "Save equipment"}
+            {busy
+              ? "Saving..."
+              : step === 3
+                ? "Save equipment"
+                : "Review in step 3 to save"}
           </button>
         </header>
         {error && (
@@ -318,265 +333,349 @@ export default function TagMappingPage() {
             its configuration.
           </p>
         )}
+        <nav
+          aria-label="Equipment setup steps"
+          className="mb-5 flex flex-wrap gap-3"
+        >
+          {[
+            "1. Machine & passport",
+            "2. Connect measurements",
+            "3. Review & monitoring",
+          ].map((label, index) => (
+            <button
+              key={label}
+              aria-current={step === index + 1 ? "step" : undefined}
+              onClick={() => setStep(index + 1)}
+              className={
+                "rounded-lg px-4 py-3 " +
+                (step === index + 1
+                  ? "bg-cyan-400 text-slate-950"
+                  : "bg-slate-800")
+              }
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(320px,1fr)]">
           <fieldset
             disabled={busy || reading || !canEdit}
             className="min-w-0 space-y-6"
           >
-            <section className="rounded-2xl border border-slate-700 bg-slate-900 p-6">
-              <h2 className="mb-5 text-lg font-semibold">Equipment identity</h2>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="grid gap-2 text-sm">
-                  Name
-                  <input
-                    className={input}
-                    value={name}
-                    maxLength={120}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Motor M205 · conveyor 2"
-                  />
-                </label>
-                <label className="grid gap-2 text-sm">
-                  Type
-                  <select
-                    className={input}
-                    value={type}
-                    onChange={(e) => setType(e.target.value)}
-                  >
-                    {["MOTOR", "PUMP", "TANK", "VALVE", "SHAFT", "OTHER"].map(
-                      (value) => (
-                        <option key={value}>{value}</option>
-                      ),
-                    )}
-                  </select>
-                </label>
-                <label className="grid gap-2 text-sm">
-                  Site
-                  <select
-                    className={input}
-                    value={siteId}
-                    onChange={(e) => {
-                      setSiteId(e.target.value);
-                      chooseIntegration("");
-                    }}
-                  >
-                    <option value="">Select site</option>
-                    {sites.map((site) => (
-                      <option key={site.id} value={site.id}>
-                        {site.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="grid gap-2 text-sm">
-                  PLC integration
-                  <select
-                    className={input}
-                    value={integrationId}
-                    onChange={(e) => chooseIntegration(e.target.value)}
-                  >
-                    <option value="">Select integration</option>
-                    {integrations
-                      .filter((item) => item.siteId === siteId)
-                      .map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.name}
+            <div hidden={step !== 1} className="space-y-6">
+              <section className="rounded-2xl border border-slate-700 bg-slate-900 p-6">
+                <h2 className="mb-5 text-lg font-semibold">
+                  Equipment identity
+                </h2>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="grid gap-2 text-sm">
+                    Name
+                    <input
+                      className={input}
+                      value={name}
+                      maxLength={120}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Motor M205 · conveyor 2"
+                    />
+                  </label>
+                  <label className="grid gap-2 text-sm">
+                    Type
+                    <select
+                      className={input}
+                      value={type}
+                      onChange={(e) => setType(e.target.value)}
+                    >
+                      {["MOTOR", "PUMP", "TANK", "VALVE", "SHAFT", "OTHER"].map(
+                        (value) => (
+                          <option key={value}>{value}</option>
+                        ),
+                      )}
+                    </select>
+                  </label>
+                  <label className="grid gap-2 text-sm">
+                    Site
+                    <select
+                      className={input}
+                      value={siteId}
+                      onChange={(e) => {
+                        setSiteId(e.target.value);
+                        chooseIntegration("");
+                      }}
+                    >
+                      <option value="">Select site</option>
+                      {sites.map((site) => (
+                        <option key={site.id} value={site.id}>
+                          {site.name}
                         </option>
                       ))}
-                  </select>
-                </label>
-                <label className="grid gap-2 text-sm sm:col-span-2">
-                  Location
-                  <input
-                    className={input}
-                    value={location}
-                    maxLength={256}
-                    onChange={(e) => setLocation(e.target.value)}
-                    placeholder="Production hall · line 2"
-                  />
-                </label>
-              </div>
-            </section>
-            {integrations.find((item) => item.id === integrationId) && (
-              <PlcTagPicker
-                key={integrationId}
-                integration={
-                  integrations.find((item) => item.id === integrationId)!
-                }
-                onAdd={(tag) => {
-                  setAlarmTags((current) =>
-                    current.some((item) => item.nodeId === tag.nodeId)
-                      ? current
-                      : [...current, tag],
-                  );
-                  setDrafts((current) =>
-                    current.some((item) => item.nodeId === tag.nodeId)
-                      ? current
-                      : [...current, { ...suggest(tag), enabled: false }],
-                  );
-                  const stored = loadDiscovered(integrationId);
-                  if (!stored.some((item) => item.nodeId === tag.nodeId)) {
-                    try {
-                      localStorage.setItem(
-                        "discoveredTags:" +
-                          user?.companyId +
-                          ":" +
-                          integrationId,
-                        JSON.stringify([...stored, tag]),
-                      );
-                    } catch {
-                      /* Tag is still available in this editor. */
-                    }
+                    </select>
+                  </label>
+                  <label className="grid gap-2 text-sm">
+                    PLC integration
+                    <select
+                      className={input}
+                      value={integrationId}
+                      onChange={(e) => chooseIntegration(e.target.value)}
+                    >
+                      <option value="">Select integration</option>
+                      {integrations
+                        .filter((item) => item.siteId === siteId)
+                        .map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.name}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                  <label className="grid gap-2 text-sm sm:col-span-2">
+                    Location
+                    <input
+                      className={input}
+                      value={location}
+                      maxLength={256}
+                      onChange={(e) => setLocation(e.target.value)}
+                      placeholder="Production hall · line 2"
+                    />
+                  </label>
+                </div>
+              </section>
+              <PassportEditor value={passport} onChange={setPassport} />
+            </div>
+            <div hidden={step !== 2} className="space-y-6">
+              <p className="text-slate-300">
+                Browse or add this machine’s PLC tags, then assign their
+                meaning. Read PLC values to check each selection against the
+                actual measurement.
+              </p>
+              {integrations.find((item) => item.id === integrationId) && (
+                <PlcTagPicker
+                  key={integrationId}
+                  integration={
+                    integrations.find((item) => item.id === integrationId)!
                   }
-                }}
-              />
-            )}
-            <MonitoringEditor
-              value={monitoring}
-              onChange={setMonitoring}
-              tags={Array.from(
-                new Map(
-                  [...drafts, ...alarmTags].map((tag) => [tag.nodeId, tag]),
-                ).values(),
-              )}
-            />
-            <AlarmRulesEditor
-              rules={alarmRules}
-              onChange={(rules) => {
-                setAlarmRules(rules);
-                setReadings([]);
-              }}
-              tags={Array.from(
-                new Map(
-                  [...drafts, ...alarmTags].map((tag) => [tag.nodeId, tag]),
-                ).values(),
-              )}
-              equipment={assets}
-              type={type}
-              equipmentId={equipmentId}
-              integrationId={integrationId}
-            />
-            <section className="rounded-2xl border border-slate-700 bg-slate-900 p-6">
-              <div className="mb-5 flex items-center justify-between gap-3">
-                <h2 className="text-lg font-semibold">
-                  Metrics · {metrics.length} selected
-                </h2>
-                <button
-                  className="text-sm text-cyan-300"
-                  onClick={() => {
-                    const discovered = loadDiscovered(integrationId);
-                    setDrafts((current) => [
-                      ...current,
-                      ...discovered.filter(
-                        (tag) =>
-                          !current.some((item) => item.nodeId === tag.nodeId),
-                      ),
-                    ]);
-                  }}
-                >
-                  Import selected tags
-                </button>
-              </div>
-              {drafts.length === 0 && (
-                <p className="rounded-xl border border-dashed border-slate-700 p-6 text-sm text-slate-400">
-                  Save a PLC integration and select its tags in{" "}
-                  <Link to="/integrations" className="text-cyan-300">
-                    OPC UA Browser
-                  </Link>
-                  , then return here.
-                </p>
-              )}
-              <div className="space-y-4">
-                {drafts.map((item, index) => (
-                  <div
-                    key={item.nodeId}
-                    className={
-                      "rounded-xl border p-4 " +
-                      (item.enabled
-                        ? "border-slate-600"
-                        : "border-slate-800 opacity-60")
+                  onAdd={(tag) => {
+                    setAlarmTags((current) =>
+                      current.some((item) => item.nodeId === tag.nodeId)
+                        ? current
+                        : [...current, tag],
+                    );
+                    setDrafts((current) =>
+                      current.some((item) => item.nodeId === tag.nodeId)
+                        ? current
+                        : [...current, { ...suggest(tag), enabled: false }],
+                    );
+                    const stored = loadDiscovered(integrationId);
+                    if (!stored.some((item) => item.nodeId === tag.nodeId)) {
+                      try {
+                        localStorage.setItem(
+                          "discoveredTags:" +
+                            user?.companyId +
+                            ":" +
+                            integrationId,
+                          JSON.stringify([...stored, tag]),
+                        );
+                      } catch {
+                        /* Tag is still available in this editor. */
+                      }
                     }
+                  }}
+                />
+              )}
+              <section className="rounded-2xl border border-slate-700 bg-slate-900 p-6">
+                <div className="mb-5 flex items-center justify-between gap-3">
+                  <h2 className="text-lg font-semibold">
+                    Connect measurements · {metrics.length} selected
+                  </h2>
+                  <button
+                    className="text-sm text-cyan-300"
+                    onClick={() => {
+                      const discovered = loadDiscovered(integrationId);
+                      setDrafts((current) => [
+                        ...current,
+                        ...discovered.filter(
+                          (tag) =>
+                            !current.some((item) => item.nodeId === tag.nodeId),
+                        ),
+                      ]);
+                    }}
                   >
-                    <div className="mb-4 flex items-start gap-3">
-                      <input
-                        aria-label={"Display " + item.tagName}
-                        type="checkbox"
-                        checked={item.enabled}
-                        onChange={(e) =>
-                          update(index, { enabled: e.target.checked })
-                        }
-                        className="mt-1 accent-cyan-400"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <strong className="block break-all text-sm">
-                          {item.tagName}
-                        </strong>
-                        <p className="mt-1 break-all text-xs text-slate-500">
-                          {item.nodeId}
-                        </p>
-                      </div>
-                      <button
-                        aria-label={"Move " + item.tagName + " up"}
-                        disabled={index === 0}
-                        onClick={() => move(index, -1)}
-                        className="text-cyan-300 disabled:opacity-20"
-                      >
-                        <ArrowUp size={18} />
-                      </button>
-                      <button
-                        aria-label={"Move " + item.tagName + " down"}
-                        disabled={index === drafts.length - 1}
-                        onClick={() => move(index, 1)}
-                        className="text-cyan-300 disabled:opacity-20"
-                      >
-                        <ArrowDown size={18} />
-                      </button>
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-[1fr_1fr_90px]">
-                      <label className="grid gap-2 text-xs text-slate-400">
-                        Display label
+                    Import selected tags
+                  </button>
+                </div>
+                {drafts.length === 0 && (
+                  <p className="rounded-xl border border-dashed border-slate-700 p-6 text-sm text-slate-400">
+                    Save a PLC integration and select its tags in{" "}
+                    <Link to="/integrations" className="text-cyan-300">
+                      OPC UA Browser
+                    </Link>
+                    , then return here.
+                  </p>
+                )}
+                <div className="space-y-4">
+                  {drafts.map((item, index) => (
+                    <div
+                      key={item.nodeId}
+                      className={
+                        "rounded-xl border p-4 " +
+                        (item.enabled
+                          ? "border-slate-600"
+                          : "border-slate-800 opacity-60")
+                      }
+                    >
+                      <div className="mb-4 flex items-start gap-3">
                         <input
-                          value={item.label}
-                          maxLength={120}
+                          aria-label={"Display " + item.tagName}
+                          type="checkbox"
+                          checked={item.enabled}
                           onChange={(e) =>
-                            update(index, { label: e.target.value })
+                            update(index, { enabled: e.target.checked })
                           }
-                          className={input}
+                          className="mt-1 accent-cyan-400"
                         />
-                      </label>
-                      <label className="grid gap-2 text-xs text-slate-400">
-                        Metric meaning
-                        <select
-                          value={item.role}
-                          onChange={(e) =>
-                            update(index, {
-                              role: e.target.value,
-                              unit: roles[e.target.value],
-                            })
-                          }
-                          className={input}
+                        <div className="min-w-0 flex-1">
+                          <strong className="block break-all text-sm">
+                            {item.tagName}
+                          </strong>
+                          <p className="mt-1 text-sm text-cyan-300">
+                            {(() => {
+                              const r = readings.find(
+                                (r) => r.nodeId === item.nodeId,
+                              );
+                              return r?.good && r.value != null
+                                ? `Last read: ${String(r.value)} ${item.unit} · ${readAt}`
+                                : "No valid reading — use Read PLC values";
+                            })()}
+                          </p>
+                          <p className="mt-1 break-all text-xs text-slate-500">
+                            {item.nodeId}
+                          </p>
+                        </div>
+                        <button
+                          aria-label={"Move " + item.tagName + " up"}
+                          disabled={index === 0}
+                          onClick={() => move(index, -1)}
+                          className="text-cyan-300 disabled:opacity-20"
                         >
-                          {Object.keys(roles).map((role) => (
-                            <option key={role}>{role}</option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="grid gap-2 text-xs text-slate-400">
-                        Unit
-                        <input
-                          value={item.unit}
-                          maxLength={32}
-                          onChange={(e) =>
-                            update(index, { unit: e.target.value })
-                          }
-                          className={input}
-                        />
-                      </label>
+                          <ArrowUp size={18} />
+                        </button>
+                        <button
+                          aria-label={"Move " + item.tagName + " down"}
+                          disabled={index === drafts.length - 1}
+                          onClick={() => move(index, 1)}
+                          className="text-cyan-300 disabled:opacity-20"
+                        >
+                          <ArrowDown size={18} />
+                        </button>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-[1fr_1fr_90px]">
+                        <label className="grid gap-2 text-xs text-slate-400">
+                          Display label
+                          <input
+                            value={item.label}
+                            maxLength={120}
+                            onChange={(e) =>
+                              update(index, { label: e.target.value })
+                            }
+                            className={input}
+                          />
+                        </label>
+                        <label className="grid gap-2 text-xs text-slate-400">
+                          What does this signal measure?
+                          <select
+                            value={item.role}
+                            onChange={(e) =>
+                              update(index, {
+                                role: e.target.value,
+                                unit: roles[e.target.value],
+                              })
+                            }
+                            className={input}
+                          >
+                            {Object.keys(roles).map((role) => (
+                              <option key={role}>{role}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="grid gap-2 text-xs text-slate-400">
+                          Unit
+                          <input
+                            value={item.unit}
+                            maxLength={32}
+                            onChange={(e) =>
+                              update(index, { unit: e.target.value })
+                            }
+                            className={input}
+                          />
+                        </label>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </section>
+                  ))}
+                </div>
+              </section>
+            </div>
+            <div hidden={step !== 3} className="space-y-6">
+              <section className="panel space-y-3">
+                <h2>Review {name || "equipment"}</h2>
+                <p>
+                  {type} · {metrics.length} displayed measurements ·{" "}
+                  {alarmRules.length} alarm rules
+                </p>
+                <p className="text-sm text-slate-400">
+                  Check tag meanings and units before saving. Changing a display
+                  unit does not convert the PLC value. Passport ratings do not
+                  automatically create alarms.
+                </p>
+                <ul>
+                  {metrics.map((m) => (
+                    <li key={m.nodeId} className="my-2 break-words">
+                      {m.label}: {m.tagName} → {m.role} ({m.unit || "no unit"})
+                    </li>
+                  ))}
+                </ul>
+              </section>
+              <PassportSummary value={passport} />
+              <MonitoringEditor
+                value={monitoring}
+                onChange={setMonitoring}
+                tags={Array.from(
+                  new Map(
+                    [...drafts, ...alarmTags].map((tag) => [tag.nodeId, tag]),
+                  ).values(),
+                )}
+              />
+              <AlarmRulesEditor
+                rules={alarmRules}
+                onChange={(rules) => {
+                  setAlarmRules(rules);
+                  setReadings([]);
+                }}
+                tags={Array.from(
+                  new Map(
+                    [...drafts, ...alarmTags].map((tag) => [tag.nodeId, tag]),
+                  ).values(),
+                )}
+                equipment={assets}
+                type={type}
+                equipmentId={equipmentId}
+                integrationId={integrationId}
+              />
+            </div>
+            <div className="flex justify-between gap-3">
+              <button
+                disabled={step === 1}
+                onClick={() => setStep(step - 1)}
+                className="text-cyan-300 disabled:opacity-30"
+              >
+                ← Back
+              </button>
+              <button
+                disabled={step === 3}
+                onClick={() => setStep(step + 1)}
+                className="text-cyan-300 disabled:opacity-30"
+              >
+                Next →
+              </button>
+            </div>
           </fieldset>
           <aside className="min-w-0 lg:sticky lg:top-6">
             <div className="mb-3 flex items-center justify-between">
@@ -584,7 +683,7 @@ export default function TagMappingPage() {
               <button
                 onClick={readPreview}
                 disabled={
-                  reading || busy || !integrationId || metrics.length === 0
+                  reading || busy || !integrationId || drafts.length === 0
                 }
                 className="flex items-center gap-2 text-sm text-cyan-300 disabled:opacity-40"
               >

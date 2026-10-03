@@ -1,3 +1,4 @@
+import { validatePassport } from './equipment-passport';
 import {
   BadRequestException,
   Injectable,
@@ -34,6 +35,7 @@ export type EquipmentInput = {
   mappings: MetricInput[];
   alarmRules?: AlarmRule[];
   monitoring?: MonitoringConfig;
+  passport?: Record<string, string | number>;
 };
 
 @Injectable()
@@ -125,6 +127,8 @@ export class TagMappingService {
         'Provide name, equipment type, site and integration',
       );
     }
+    const passport =
+      body.passport === undefined ? undefined : validatePassport(body.passport);
     const monitoring =
       body.monitoring === undefined
         ? undefined
@@ -215,6 +219,7 @@ export class TagMappingService {
           );
       }
       const data = {
+        ...(passport !== undefined ? { passport } : {}),
         ...(monitoring !== undefined ? { monitoring } : {}),
         ...(alarmRules !== undefined ? { alarmRules } : {}),
         name: body.name.trim(),

@@ -25,7 +25,7 @@ describe('Equipment ownership and configuration', () => {
   function setup() {
     const tx = {
       $queryRaw: jest.fn(),
-      maintenanceCase: {count: jest.fn().mockResolvedValue(0)},
+      maintenanceCase: { count: jest.fn().mockResolvedValue(0) },
       site: { findFirst: jest.fn().mockResolvedValue({ id: 'site-a' }) },
       integration: {
         findFirst: jest
@@ -52,6 +52,30 @@ describe('Equipment ownership and configuration', () => {
     );
     return { service, prisma, tx, opcua };
   }
+  it('saves passport independently of alarm limits and preserves omitted passport on edit', async () => {
+    const { service, tx } = setup();
+    await service.saveEquipment('company-a', {
+      ...draft,
+      passport: { ratedCurrentA: 16, model: ' M1 ' },
+    });
+    expect(tx.asset.create.mock.calls[0][0].data.passport).toEqual({
+      ratedCurrentA: 16,
+      model: 'M1',
+    });
+    expect(tx.asset.create.mock.calls[0][0].data).not.toHaveProperty(
+      'alarmRules',
+    );
+    await service.saveEquipment('company-a', { ...draft, id: 'asset-a' });
+    expect(tx.asset.update.mock.calls[0][0].data).not.toHaveProperty(
+      'passport',
+    );
+    await service.saveEquipment('company-a', {
+      ...draft,
+      id: 'asset-a',
+      passport: {},
+    });
+    expect(tx.asset.update.mock.calls[1][0].data.passport).toEqual({});
+  });
   it('rejects foreign or mismatched integrations before writing', async () => {
     const { service, tx } = setup();
     tx.integration.findFirst.mockResolvedValue(null);
