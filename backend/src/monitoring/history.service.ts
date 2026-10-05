@@ -29,6 +29,56 @@ export class HistoryService {
     if (!asset) throw new NotFoundException('Equipment not found');
     return asset;
   }
+  async catalog(
+    user: { companyId?: string },
+    search = '',
+    pageText = '0',
+    assetId = '',
+  ) {
+    if (!user.companyId)
+      throw new ForbiddenException('Company account required');
+    const page = Number(pageText);
+    if (
+      !Number.isInteger(page) ||
+      page < 0 ||
+      page > 100000 ||
+      search.length > 120
+    )
+      throw new BadRequestException('Invalid history search or page');
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        assetId: string;
+        assetName: string;
+        day: string;
+        samples: number;
+        first: Date;
+        last: Date;
+        critical: boolean;
+        warning: boolean;
+        bad: number;
+        gaps: number;
+      }>
+    >`
+      WITH s AS (
+        SELECT e.*, a.name AS "assetName",
+          LAG(e."sampledAt") OVER (PARTITION BY e."assetId" ORDER BY e."sampledAt") AS previous
+        FROM "EquipmentSample" e JOIN "Asset" a ON a.id=e."assetId" AND a."companyId"=e."companyId"
+        WHERE e."companyId"=${user.companyId}
+          AND (${assetId}='' OR e."assetId"=${assetId})
+          AND position(lower(${search.trim()}) IN lower(a.name || ' ' || COALESCE(a.location,'') || ' ' || a.type)) > 0
+      )
+      SELECT "assetId", "assetName", to_char("sampledAt", 'YYYY-MM-DD') AS day,
+        COUNT(*)::int AS samples, MIN("sampledAt") AS first, MAX("sampledAt") AS last,
+        bool_or(severity='CRITICAL') AS critical, bool_or(severity='WARNING') AS warning,
+        COUNT(*) FILTER (WHERE "hasBadData")::int AS bad,
+        COUNT(*) FILTER (WHERE "sampledAt" - previous > interval '5 seconds')::int AS gaps
+      FROM s GROUP BY "assetId", "assetName", day
+      ORDER BY day DESC, "assetId" ASC LIMIT 31 OFFSET ${page * 30}`;
+    return {
+      files: rows.slice(0, 30),
+      nextPage: rows.length > 30 ? page + 1 : null,
+    };
+  }
   async days(user: { companyId?: string }, id: string, before?: string) {
     await this.asset(user, id);
     const boundary = before ? new Date(before) : new Date();

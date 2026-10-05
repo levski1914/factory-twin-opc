@@ -9,6 +9,14 @@ import { HistoryService } from './history.service';
 @Roles('OWNER', 'ADMIN', 'TECHNICIAN', 'VIEWER')
 export class HistoryController {
   constructor(private history: HistoryService) {}
+  @Get('catalog') catalog(
+    @CurrentUser() u: any,
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('assetId') assetId?: string,
+  ) {
+    return this.history.catalog(u, search, page, assetId);
+  }
   @Get(':id/days') days(
     @CurrentUser() u: any,
     @Param('id') id: string,

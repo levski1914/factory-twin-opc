@@ -15,6 +15,42 @@ function setup(found = true) {
   return { prisma, service: new HistoryService(prisma) };
 }
 describe('History boundaries', () => {
+  it('requires a company for the all-equipment catalog', async () => {
+    const { service, prisma } = setup();
+    await expect(service.catalog({}, 'motor')).rejects.toThrow(
+      'Company account required',
+    );
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+  });
+  it('paginates the catalog and binds search and company as values', async () => {
+    const { service, prisma } = setup();
+    prisma.$queryRaw.mockResolvedValue(
+      Array.from({ length: 31 }, (_, i) => ({ assetId: String(i) })),
+    );
+    const result = await service.catalog(
+      { companyId: 'company-a' },
+      "motor' OR 1=1",
+      '2',
+    );
+    expect(result.files).toHaveLength(30);
+    expect(result.nextPage).toBe(3);
+    const args = prisma.$queryRaw.mock.calls[0];
+    expect(args.slice(1)).toContain('company-a');
+    expect(args.slice(1)).toContain("motor' OR 1=1");
+    expect(args[0].join('')).not.toContain("motor' OR 1=1");
+    expect(args.at(-1)).toBe(60);
+  });
+  it('rejects invalid catalog pagination and excessively long searches', async () => {
+    const { service } = setup();
+    for (const page of ['-1', '1.5', 'bad'])
+      await expect(
+        service.catalog({ companyId: 'a' }, '', page),
+      ).rejects.toThrow();
+    await expect(
+      service.catalog({ companyId: 'a' }, 'x'.repeat(121)),
+    ).rejects.toThrow();
+  });
+
   it('accepts a UTC day and rejects invalid or oversized ranges', () => {
     expect(+historyRange(from, to).end - +historyRange(from, to).start).toBe(
       86400000,

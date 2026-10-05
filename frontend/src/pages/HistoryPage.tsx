@@ -1,3 +1,4 @@
+import { zoomHistoryRange } from "../utils/historyNavigation";
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
@@ -12,11 +13,11 @@ import {
 } from "recharts";
 import {
   getAssets,
-  getHistoryDays,
+  getHistoryCatalog,
   getHistoryDetail,
   getHistoryRaw,
   type Equipment,
-  type HistoryDay,
+  type HistoryFile,
   type HistoryDetail,
 } from "../services/api";
 const colors = ["#38bdf8", "#a78bfa", "#fbbf24", "#34d399", "#fb7185"];
@@ -54,6 +55,31 @@ function Dossier({
     [metric, setMetric] = useState("");
   const dialog = useRef<HTMLDialogElement>(null);
   const generation = useRef(0);
+  const extent = useRef<[number, number] | null>(null);
+  const autoFit = useRef(false);
+  useEffect(() => {
+    const el = dialog.current;
+    if (!el) return;
+    const wheel = (event: WheelEvent) => {
+      const chart =
+        event.target instanceof Element
+          ? event.target.closest("[data-history-chart]")
+          : null;
+      if (!chart || !event.deltaY) return;
+      event.preventDefault();
+      const rect = chart.getBoundingClientRect();
+      const fraction = Math.max(
+        0,
+        Math.min(1, (event.clientX - rect.left) / rect.width),
+      );
+      setRange((current) =>
+        zoomHistoryRange(current, [start, end], event.deltaY, fraction),
+      );
+    };
+    el.addEventListener("wheel", wheel, { passive: false });
+    return () => el.removeEventListener("wheel", wheel);
+  }, [start, end]);
+
   useEffect(() => {
     dialog.current?.showModal();
     return () => dialog.current?.close();
@@ -62,15 +88,35 @@ function Dossier({
     let active = true;
     const g = ++generation.current;
     setBusy(true);
-    setData(null);
+
     setError("");
     const timer = setTimeout(() => {
       getHistoryDetail(assetId, iso(range[0]), iso(range[1]))
         .then((d) => {
-          if (active && g === generation.current) setData(d);
+          if (active && g === generation.current) {
+            setData(d);
+            if (!autoFit.current) {
+              autoFit.current = true;
+              if (d.samples.length) {
+                const first = +new Date(d.samples[0].sampledAt);
+                const last = +new Date(
+                  d.samples[d.samples.length - 1].sampledAt,
+                );
+                const padding = Math.max(5000, (last - first) * 0.05);
+                extent.current = [
+                  Math.max(start, first - padding),
+                  Math.min(end, last + padding),
+                ];
+                setRange(extent.current);
+              }
+            }
+          }
         })
         .catch((e) => {
-          if (active) setError(e.message);
+          if (active) {
+            setError(e.message);
+            setData(null);
+          }
         })
         .finally(() => {
           if (active) setBusy(false);
@@ -215,6 +261,30 @@ function Dossier({
           Print / Save PDF
         </button>
         <button onClick={() => setRange([start, end])}>Full day</button>
+        <button
+          disabled={!extent.current}
+          onClick={() => extent.current && setRange(extent.current)}
+        >
+          Fit recorded data
+        </button>
+        <button
+          onClick={() =>
+            setRange((current) =>
+              zoomHistoryRange(current, [start, end], -1, 0.5),
+            )
+          }
+        >
+          Zoom +
+        </button>
+        <button
+          onClick={() =>
+            setRange((current) =>
+              zoomHistoryRange(current, [start, end], 1, 0.5),
+            )
+          }
+        >
+          Zoom −
+        </button>
       </div>
       {error && (
         <p role="alert" className="text-red-300">
@@ -259,7 +329,7 @@ function Dossier({
           />
         </label>
       </div>
-      {data && !busy && (
+      {data && (
         <>
           <p className="my-3 text-sm text-slate-400">
             {data.count} raw samples. Chart: last sample per{" "}
@@ -281,20 +351,10 @@ function Dossier({
             ))}
           </select>
           <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
-            <div
-              onWheel={(e) => {
-                if (!e.ctrlKey) return;
-                e.preventDefault();
-                const half = (range[1] - range[0]) * (e.deltaY > 0 ? 0.6 : 0.4);
-                const center = (range[0] + range[1]) / 2;
-                setRange([
-                  Math.max(start, Math.floor(center - Math.max(500, half))),
-                  Math.min(end, Math.ceil(center + Math.max(500, half))),
-                ]);
-              }}
-            >
+            <div data-history-chart>
               <p className="history-controls text-xs text-slate-400">
-                Ctrl + mouse wheel to zoom, or use the sliders.
+                Mouse wheel over the chart to zoom around the pointer. Scroll
+                outside the chart to move the dialog.
               </p>
               {points.length ? (
                 <ResponsiveContainer width="100%" height={360}>
@@ -370,21 +430,20 @@ function Dossier({
 }
 export default function HistoryPage() {
   const [params] = useSearchParams();
-  const [assets, setAssets] = useState<Equipment[]>([]),
-    [asset, setAsset] = useState(params.get("assetId") || ""),
-    [days, setDays] = useState<HistoryDay[]>([]),
-    [next, setNext] = useState<string | null>(null),
-    [selected, setSelected] = useState(""),
-    [error, setError] = useState(""),
-    [loading, setLoading] = useState(false);
+  const [assets, setAssets] = useState<Equipment[]>([]);
+  const [asset, setAsset] = useState(params.get("assetId") || "");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(0);
+  const [files, setFiles] = useState<HistoryFile[]>([]);
+  const [next, setNext] = useState<number | null>(null);
+  const [selected, setSelected] = useState<HistoryFile | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
   useEffect(() => {
     let active = true;
     getAssets()
       .then((a) => {
-        if (active) {
-          setAssets(a);
-          setAsset((old) => old || a[0]?.id || "");
-        }
+        if (active) setAssets(a);
       })
       .catch((e) => {
         if (active) setError(e.message);
@@ -395,28 +454,36 @@ export default function HistoryPage() {
   }, []);
   useEffect(() => {
     let active = true;
-    setDays([]);
-    setNext(null);
-    setError("");
-    if (!asset) return;
     setLoading(true);
-    getHistoryDays(asset)
-      .then((d) => {
-        if (active) {
-          setDays(d.days);
-          setNext(d.nextBefore);
-        }
-      })
-      .catch((e) => {
-        if (active) setError(e.message);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
+    setError("");
+    setFiles([]);
+    setNext(null);
+    const timer = setTimeout(() => {
+      getHistoryCatalog(search, page, asset)
+        .then((result) => {
+          if (active) {
+            setFiles(result.files);
+            setNext(result.nextPage);
+          }
+        })
+        .catch((e) => {
+          if (active) setError(e.message);
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+    }, 250);
     return () => {
       active = false;
+      clearTimeout(timer);
     };
-  }, [asset]);
+  }, [search, page, asset]);
+  const matching = assets.filter((a) =>
+    [a.name, a.location, a.type]
+      .join(" ")
+      .toLowerCase()
+      .includes(search.toLowerCase().trim()),
+  );
   return (
     <main className="main min-h-screen">
       <Link to="/dashboard" className="back-link">
@@ -424,36 +491,69 @@ export default function HistoryPage() {
       </Link>
       <h1 className="my-4 text-2xl">Equipment dossiers</h1>
       <p className="mb-4 text-slate-400">
-        Daily records in UTC. Recording requires automatic monitoring and a
-        running backend. History begins when this update is installed.
+        Daily files in UTC. Search by equipment name, type or location.
+        Recording requires automatic monitoring.
       </p>
-      <select
-        disabled={loading}
-        aria-label="Equipment"
-        className="rounded-lg bg-slate-800 p-3"
-        value={asset}
-        onChange={(e) => {
-          setAsset(e.target.value);
-          setSelected("");
-        }}
-      >
-        <option value="">Choose equipment</option>
-        {assets.map((a) => (
-          <option key={a.id} value={a.id}>
-            {a.name}
-          </option>
-        ))}
-      </select>
-      {error && <p role="alert">{error}</p>}
-      {loading && <p>Loading…</p>}
+      <div className="flex flex-wrap gap-3">
+        <input
+          aria-label="Search equipment dossiers"
+          placeholder="Search name, type or location…"
+          maxLength={120}
+          className="rounded-lg bg-slate-800 p-3"
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(0);
+          }}
+        />
+        <select
+          aria-label="Equipment"
+          className="rounded-lg bg-slate-800 p-3"
+          value={asset}
+          onChange={(e) => {
+            setAsset(e.target.value);
+            setPage(0);
+          }}
+        >
+          <option value="">All equipment</option>
+          {assets
+            .filter(
+              (a) => a.id === asset || matching.some((m) => m.id === a.id),
+            )
+            .map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+        </select>
+        <button
+          onClick={() => {
+            setSearch("");
+            setAsset("");
+            setPage(0);
+          }}
+        >
+          Clear filters
+        </button>
+      </div>
+      <p className="my-3 text-sm text-slate-400">
+        Page {page + 1} · up to 30 daily files per page
+      </p>
+      {error && (
+        <p role="alert" className="text-red-300">
+          {error}
+        </p>
+      )}
+      {loading && <p role="status">Loading dossiers…</p>}
       <div className="my-5 grid gap-4 md:grid-cols-3">
-        {days.map((d) => (
+        {files.map((d) => (
           <button
-            key={d.day}
-            onClick={() => setSelected(d.day)}
+            key={d.assetId + d.day}
+            onClick={() => setSelected(d)}
             className="panel text-left"
           >
-            <h2>▣ {d.day}</h2>
+            <h2>{d.assetName}</h2>
+            <p>▣ {d.day}</p>
             <p
               className={
                 d.critical
@@ -479,36 +579,32 @@ export default function HistoryPage() {
           </button>
         ))}
       </div>
-      {!loading && !days.length && (
+      {!loading && !error && !files.length && (
         <p>
-          No recorded days yet. Enable automatic monitoring for this equipment.
+          No dossiers match these filters. Equipment without recorded history
+          has no daily files.
         </p>
       )}
-      {next && (
+      <div className="flex gap-4">
         <button
-          disabled={loading}
-          onClick={async () => {
-            setLoading(true);
-            try {
-              const d = await getHistoryDays(asset, next);
-              setDays((old) => [...old, ...d.days]);
-              setNext(d.nextBefore);
-            } catch (e) {
-              setError(e instanceof Error ? e.message : "Could not load days");
-            } finally {
-              setLoading(false);
-            }
-          }}
+          disabled={loading || page === 0}
+          onClick={() => setPage((p) => p - 1)}
         >
-          Load older days
+          ← Previous
         </button>
-      )}
+        <button
+          disabled={loading || next === null}
+          onClick={() => next !== null && setPage(next)}
+        >
+          Next →
+        </button>
+      </div>
       {selected && (
         <Dossier
-          key={asset + selected}
-          assetId={asset}
-          day={selected}
-          onClose={() => setSelected("")}
+          key={selected.assetId + selected.day}
+          assetId={selected.assetId}
+          day={selected.day}
+          onClose={() => setSelected(null)}
         />
       )}
     </main>

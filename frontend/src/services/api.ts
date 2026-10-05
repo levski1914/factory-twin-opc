@@ -357,3 +357,14 @@ export const getHistoryRaw = (
     `/history/${encodeURIComponent(id)}/raw?` +
       new URLSearchParams({ from, to, ...(after ? { after } : {}) }),
   );
+
+export type HistoryFile = HistoryDay & { assetId: string; assetName: string };
+export const getHistoryCatalog = (
+  search: string,
+  page: number,
+  assetId: string,
+) =>
+  request<{ files: HistoryFile[]; nextPage: number | null }>(
+    "/history/catalog?" +
+      new URLSearchParams({ search, page: String(page), assetId }),
+  );

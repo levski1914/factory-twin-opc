@@ -15,3 +15,11 @@ CSV exports every raw reading in the selected range through paginated API reques
 Storage has no automatic deletion or retention job in this first version. Each sample repeats configuration context, so plan storage capacity before sustained large deployments. Existing sequential PLC collection limitations remain. Future work: configuration version deduplication, retention policy, gap-aware aggregation, attachments, reviewed training labels, dataset/model versioning and controlled online learning. Learned models must not silently change protective thresholds or issue PLC commands.
 
 Validation: frontend/backend builds and 19 history/monitoring tests, including company boundaries and raw pagination. A live PostgreSQL migration/query test, real PLC capture, modal browser interaction and printed PDF acceptance still need deployment verification.
+
+## Navigation update
+
+The dossier catalog defaults to All equipment, with server-side search by name/type/location and 30 daily files per page. Each card identifies its equipment; selection opens only that machine's daily history. Search and equipment filters combine. Page numbers are offset-based; newly arriving daily files can shift page boundaries, so refresh page 1 when examining live arrivals.
+
+The modal initially fits the sampled record extent, with padding. Full day restores midnight-to-midnight; Fit recorded data restores the opening extent. Mouse wheel over the chart zooms around the pointer without Ctrl; wheel outside scrolls the modal. A native non-passive wheel listener prevents browser scrolling/zoom interception over the chart. Zoom +/- buttons and sliders provide alternatives. Initial fitting uses the downsampled chart extent, so raw exports remain the source for exact boundaries. Changes do not alter stored samples or require migration.
+
+Validation: both builds, 8 history-service tests and 4 pure zoom-boundary assertions. Actual browser wheel behavior and the catalog SQL still require user-environment verification.
