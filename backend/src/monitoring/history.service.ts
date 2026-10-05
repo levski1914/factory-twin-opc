@@ -82,11 +82,15 @@ export class HistoryService {
         hasBadData: boolean;
       }>
     >`
-      SELECT DISTINCT ON (floor(extract(epoch FROM "sampledAt") / ${bucketSeconds}))
-        id, "sampledAt", payload, "hasBadData"
-      FROM "EquipmentSample" WHERE "assetId"=${id} AND "companyId"=${user.companyId!}
-        AND "sampledAt">=${start} AND "sampledAt"<${end}
-      ORDER BY floor(extract(epoch FROM "sampledAt") / ${bucketSeconds}), "sampledAt" DESC`;
+      SELECT DISTINCT ON (bucket) id, "sampledAt", payload, "hasBadData"
+      FROM (
+        SELECT id, "sampledAt", payload, "hasBadData",
+          floor(extract(epoch FROM "sampledAt") / ${bucketSeconds}) AS bucket
+        FROM "EquipmentSample"
+        WHERE "assetId"=${id} AND "companyId"=${user.companyId!}
+          AND "sampledAt">=${start} AND "sampledAt"<${end}
+      ) AS bucketed
+      ORDER BY bucket, "sampledAt" DESC`;
     const events = await this.prisma.maintenanceEvent.findMany({
       where: {
         companyId: user.companyId!,
