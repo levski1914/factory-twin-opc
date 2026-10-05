@@ -45,6 +45,7 @@ function setup() {
   };
   const tx: any = {
     $queryRaw: jest.fn().mockResolvedValue([]),
+    equipmentSample: { create: jest.fn() },
     asset: { findUnique: jest.fn().mockResolvedValue(asset) },
     monitorSnapshot: {
       findUnique: jest.fn(async () => snapshot),
@@ -132,6 +133,10 @@ describe('Backend maintenance lifecycle with simulated PLC readings', () => {
     expect(s.cases).toHaveLength(1);
     expect(s.events[0].kind).toBe('CONFIRMED');
     expect(s.notifications).toHaveLength(2);
+    expect(s.tx.equipmentSample.create).toHaveBeenCalled();
+    expect(s.tx.equipmentSample.create.mock.calls.at(-1)[0].data).toMatchObject(
+      { assetId: 'motor', companyId: 'company', severity: 'CRITICAL' },
+    );
     await s.service.action(user, 'case-0', { action: 'CLAIM' });
     await s.service.action(user, 'case-0', {
       action: 'REPORT',
@@ -166,12 +171,12 @@ describe('Backend maintenance lifecycle with simulated PLC readings', () => {
     const count = s.notifications.length;
     for (let i = 0; i < 5; i++)
       await s.service.action(user, 'case-0', { action: 'CLAIM' });
-    expect(s.events.filter(e => e.kind === 'CLAIMED')).toHaveLength(1);
+    expect(s.events.filter((e) => e.kind === 'CLAIMED')).toHaveLength(1);
     expect(s.notifications).toHaveLength(count);
     s.cases[0].status = 'VERIFICATION_FAILED';
     await s.service.action(user, 'case-0', { action: 'CLAIM' });
     expect(s.cases[0].status).toBe('IN_PROGRESS');
-    expect(s.events.filter(e => e.kind === 'CLAIMED')).toHaveLength(2);
+    expect(s.events.filter((e) => e.kind === 'CLAIMED')).toHaveLength(2);
   });
   it('scopes task actions to the company and assigned engineer', async () => {
     const s = setup();

@@ -340,6 +340,11 @@ export default function ConfiguredEquipmentPage() {
             </section>
           </div>
         )}
+        {asset && (
+          <Link className="back-link" to={"/history?assetId=" + asset.id}>
+            Open equipment dossiers →
+          </Link>
+        )}
         {asset && <PassportSummary value={asset.passport} />}
         {asset?.monitoring?.enabled && (
           <MaintenanceTasks data={monitoringData} assetId={asset.id} />

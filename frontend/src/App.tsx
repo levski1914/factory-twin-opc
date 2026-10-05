@@ -1,3 +1,4 @@
+import HistoryPage from "./pages/HistoryPage";
 import TeamPage from "./pages/TeamPage";
 import {
   BrowserRouter,
@@ -47,6 +48,7 @@ function App() {
           <Route path="/login" element={<AuthPage mode="login" />} />
           <Route path="/register" element={<AuthPage mode="register" />} />
           <Route element={<Protected />}>
+            <Route path="/history" element={<HistoryPage />} />
             <Route path="/team" element={<TeamPage />} />
             <Route path="/maintenance" element={<MaintenancePage />} />
             <Route path="/dashboard" element={<Dashboard />} />

@@ -96,6 +96,7 @@ export class MonitoringService implements OnModuleInit, OnModuleDestroy {
       name: string;
       companyId: string | null;
       monitoring: unknown;
+      passport?: unknown;
       alarmRules: unknown;
       updatedAt: Date;
       tagMappings: Array<{ nodeId: string; integrationId: string }>;
@@ -274,6 +275,28 @@ export class MonitoringService implements OnModuleInit, OnModuleDestroy {
               true,
             );
         }
+        await tx.equipmentSample.create({
+          data: {
+            assetId: asset.id,
+            companyId: asset.companyId!,
+            sampledAt: new Date(now),
+            severity: states.some((r) => r.latched && r.severity === 'CRITICAL')
+              ? 'CRITICAL'
+              : states.some((r) => r.latched)
+                ? 'WARNING'
+                : 'NONE',
+            hasBadData:
+              Boolean(error) ||
+              readings.some((r) => !r.good || r.value == null) ||
+              ids.some((id) => !readings.some((r) => r.nodeId === id)),
+            payload: json({
+              ...payload,
+              assetName: asset.name,
+              passport: asset.passport ?? {},
+              mappings: asset.tagMappings,
+            }),
+          },
+        });
         await tx.monitorSnapshot.upsert({
           where: { assetId: asset.id },
           create: {

@@ -306,3 +306,54 @@ export const createTeamMember = (data: {
   role: string;
 }) =>
   request<TeamMember>("/team", { method: "POST", body: JSON.stringify(data) });
+
+export type HistorySample = {
+  id: string;
+  sampledAt: string;
+  hasBadData: boolean;
+  payload: {
+    readings: PlcReading[];
+    mappings?: Metric[];
+    error?: string | null;
+    [key: string]: unknown;
+  };
+};
+export type HistoryDay = {
+  day: string;
+  samples: number;
+  first: string;
+  last: string;
+  critical: boolean;
+  warning: boolean;
+  bad: number;
+  gaps: number;
+};
+export type HistoryDetail = {
+  asset: { id: string; name: string };
+  from: string;
+  to: string;
+  count: number;
+  bucketSeconds: number;
+  samples: HistorySample[];
+  events: MaintenanceEvent[];
+  eventsTruncated: boolean;
+};
+export const getHistoryDays = (id: string, before?: string) =>
+  request<{ days: HistoryDay[]; nextBefore: string | null }>(
+    `/history/${encodeURIComponent(id)}/days${before ? "?before=" + encodeURIComponent(before) : ""}`,
+  );
+export const getHistoryDetail = (id: string, from: string, to: string) =>
+  request<HistoryDetail>(
+    `/history/${encodeURIComponent(id)}/detail?` +
+      new URLSearchParams({ from, to }),
+  );
+export const getHistoryRaw = (
+  id: string,
+  from: string,
+  to: string,
+  after?: string,
+) =>
+  request<{ rows: HistorySample[]; nextAfter: string | null }>(
+    `/history/${encodeURIComponent(id)}/raw?` +
+      new URLSearchParams({ from, to, ...(after ? { after } : {}) }),
+  );

@@ -664,3 +664,12 @@ body {
 .monitor-warning { border: 2px solid #fb923c !important; box-shadow: inset 0 0 18px #fb923c18; }
 .monitor-critical { border: 2px solid #f87171 !important; box-shadow: inset 0 0 18px #f8717120; }
 .monitor-unknown { border: 2px dashed #94a3b8 !important; }
+
+.history-dialog { width: min(1400px, 96vw); max-height: 94vh; overflow: auto; }
+@media print {
+ body:has(.history-dialog[open]) * { visibility: hidden; }
+ .history-dialog[open], .history-dialog[open] * { visibility: visible; }
+ .history-dialog[open] { position: absolute; inset: 0; width: 100%; max-height: none; overflow: visible; color: black; background: white; }
+ .history-dialog .history-controls { display: none; }
+ .history-dialog aside { max-height: none; overflow: visible; }
+}

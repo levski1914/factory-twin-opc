@@ -203,3 +203,15 @@ model MonitorNotification {
   createdAt DateTime @default(now())
   @@index([companyId, userId, createdAt])
 }
+
+model EquipmentSample {
+  id String @id @default(cuid())
+  assetId String
+  companyId String
+  sampledAt DateTime
+  severity String
+  hasBadData Boolean
+  payload Json
+  @@unique([assetId, sampledAt])
+  @@index([companyId, assetId, sampledAt])
+}

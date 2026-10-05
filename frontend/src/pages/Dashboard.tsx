@@ -75,6 +75,7 @@ export default function Dashboard() {
               <Settings size={18} /> Team
             </Link>
           )}
+          <Link to="/history" className="nav-item"><Settings size={18} /> Dossiers</Link>
           <p className="empty-text workspace-email">{user?.email}</p>
           <button
             onClick={() => void signOut().then(() => location.assign("/"))}

@@ -1,0 +1,17 @@
+# Equipment dossiers
+
+Apply after company-team. This patch deliberately excludes generated Prisma client files to avoid local generator conflicts. Stop the backend, apply with git am, run `npx prisma migrate deploy` then `npx prisma generate` in backend, and restart both applications. Generated files can be committed separately with `git add backend/src/generated/prisma` and a regeneration commit if changed.
+
+Dashboard → Dossiers or Open equipment dossiers on a machine opens its daily records. Dates, sliders and event times are explicitly UTC. The service records one immutable EquipmentSample per completed monitoring sample in the same transaction as state updates. Recording requires enabled automatic monitoring. No historic measurements are backfilled. Server downtime has no samples, not inferred normal readings.
+
+Samples retain raw values, OPC quality and source timestamps, server observation time, configured rules and monitoring criteria, mapping labels/units, passport and observed states. This is groundwork for datasets; no neural network or training is included. Reports of repair and verification results remain distinct events. No PLC write commands are added.
+
+Daily cards show sample count, first/last observations, worst confirmed alarm severity, bad/missing-data sample count and observed gaps longer than five seconds. Gaps count does not estimate every outage or missing time at day boundaries. Days without records are absent. Thirty days per page; load older days for more.
+
+The modal supports two range sliders, Ctrl+wheel zoom, metric selection and event markers. Selecting an event focuses ±60 seconds. Red markers indicate confirmation/escalation/failed verification (confirmation may be warning severity); green is verification passed, amber is another maintenance action. Marker text and event messages are authoritative. The chart displays the last sample in each time bucket, targeting about 1800 samples. Short spikes may be omitted at broad ranges. Narrow the range or use the raw export for investigation. There is no interpolation across missing/bad values; broad charts cannot reliably display every brief quality gap.
+
+CSV exports every raw reading in the selected range through paginated API requests. JSON exports full raw samples and the displayed maintenance events, including an eventsTruncated flag. Event lists are capped at 2000 per range; narrow the range when capped. All ranges are end-exclusive and at most 24 hours. Print / Save PDF uses the browser print dialog for the selected chart and event list; PDF rendering has not been browser-verified in this environment. The current day is a snapshot: reopen the record to refresh it. Raw exports can include samples added during export; closed past periods are more reproducible.
+
+Storage has no automatic deletion or retention job in this first version. Each sample repeats configuration context, so plan storage capacity before sustained large deployments. Existing sequential PLC collection limitations remain. Future work: configuration version deduplication, retention policy, gap-aware aggregation, attachments, reviewed training labels, dataset/model versioning and controlled online learning. Learned models must not silently change protective thresholds or issue PLC commands.
+
+Validation: frontend/backend builds and 19 history/monitoring tests, including company boundaries and raw pagination. A live PostgreSQL migration/query test, real PLC capture, modal browser interaction and printed PDF acceptance still need deployment verification.
